@@ -14,9 +14,12 @@ from .constants import (
     DEFAULT_DATA_DIR,
     DEFAULT_DB_DIR,
     DEFAULT_DB_NAME,
+    DEFAULT_LOG_FORMAT,
+    DEFAULT_LOG_LEVEL,
     DEFAULT_PRICES_DIR,
     DEFAULT_SETS_DIR,
     PROGRESS_INTERVAL,
+    VALID_LOG_LEVELS,
 )
 
 logger = logging.getLogger(__name__)
@@ -47,7 +50,7 @@ class MTGConfig:
         )
 
         # Logging configuration
-        self.log_level = os.getenv("MTG_LOG_LEVEL", "INFO").upper()
+        self.log_level = os.getenv("MTG_LOG_LEVEL", DEFAULT_LOG_LEVEL).upper()
         self.log_file = os.getenv("MTG_LOG_FILE")
 
         # Validation
@@ -61,15 +64,13 @@ class MTGConfig:
         if self.progress_interval <= 0:
             raise ValueError("Progress interval must be positive")
 
-        if self.log_level not in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]:
+        if self.log_level not in VALID_LOG_LEVELS:
             raise ValueError(f"Invalid log level: {self.log_level}")
 
     def setup_logging(self) -> None:
         """Set up logging based on configuration."""
-        log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-
         # Configure basic logging
-        logging.basicConfig(level=getattr(logging, self.log_level), format=log_format)
+        logging.basicConfig(level=getattr(logging, self.log_level), format=DEFAULT_LOG_FORMAT)
 
         # Add file handler if specified
         if self.log_file:
@@ -78,7 +79,7 @@ class MTGConfig:
 
             file_handler = logging.FileHandler(log_path)
             file_handler.setLevel(getattr(logging, self.log_level))
-            file_handler.setFormatter(logging.Formatter(log_format))
+            file_handler.setFormatter(logging.Formatter(DEFAULT_LOG_FORMAT))
 
             # Add to root logger
             logging.getLogger().addHandler(file_handler)

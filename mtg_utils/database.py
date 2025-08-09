@@ -9,13 +9,27 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from .constants import (
-    CARD_PRICES_TABLE_SCHEMA,
-    CARDS_INDEXES,
-    CARDS_TABLE_SCHEMA,
     DEFAULT_BATCH_SIZE,
     DEFAULT_DB_DIR,
     DEFAULT_DB_NAME,
+)
+from .sql import (
+    CARD_PRICES_TABLE_SCHEMA,
+    CARDS_INDEXES,
+    CARDS_TABLE_SCHEMA,
+    CHECK_TABLE_EXISTS,
+    DROP_CARDS_TABLE,
+    DROP_CARD_PRICES_TABLE,
+    GET_TABLE_COLUMNS,
     PRICE_INDEXES,
+    SELECT_ALL_CARD_UUIDS,
+    SELECT_CARD_BY_UUID,
+    GET_CARD_COUNT,
+    GET_CARDS_BY_SET,
+    GET_RARITY_DISTRIBUTION,
+    get_insert_cards_query,
+    get_add_column_query,
+    create_temp_table_query,
 )
 
 logger = logging.getLogger(__name__)
@@ -88,13 +102,7 @@ def table_exists(conn: sqlite3.Connection, table_name: str) -> bool:
         True if table exists, False otherwise
     """
     cursor = conn.cursor()
-    cursor.execute(
-        """
-        SELECT name FROM sqlite_master
-        WHERE type='table' AND name=?
-    """,
-        (table_name,),
-    )
+    cursor.execute(CHECK_TABLE_EXISTS, (table_name,))
     return cursor.fetchone() is not None
 
 
@@ -151,8 +159,8 @@ def drop_all_tables(conn: sqlite3.Connection) -> None:
     """
     cursor = conn.cursor()
     # Drop in order due to foreign key constraints
-    cursor.execute("DROP TABLE IF EXISTS card_prices")
-    cursor.execute("DROP TABLE IF EXISTS cards")
+    cursor.execute(DROP_CARD_PRICES_TABLE)
+    cursor.execute(DROP_CARDS_TABLE)
     conn.commit()
     logger.info("✓ Dropped existing tables for fresh start")
 
@@ -172,11 +180,11 @@ def ensure_column_exists(
         True if column was added, False if it already existed
     """
     cursor = conn.cursor()
-    cursor.execute(f"PRAGMA table_info({table})")
+    cursor.execute(GET_TABLE_COLUMNS.format(table=table))
     columns = [column_info[1] for column_info in cursor.fetchall()]
 
     if column not in columns:
-        cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {column_type}")
+        cursor.execute(get_add_column_query(table, column, column_type))
         conn.commit()
         logger.info(f"✓ Added {column} column to {table} table")
         return True
@@ -204,9 +212,9 @@ def batch_insert_cards(
     skipped_cards = 0
 
     # Get number of columns in cards table
-    cursor.execute("PRAGMA table_info(cards)")
+    cursor.execute(GET_TABLE_COLUMNS.format(table="cards"))
     num_columns = len(cursor.fetchall())
-    placeholders = ",".join(["?" for _ in range(num_columns)])
+    insert_query = get_insert_cards_query(num_columns)
 
     for i in range(0, len(cards_data), batch_size):
         batch = cards_data[i : i + batch_size]
@@ -215,16 +223,11 @@ def batch_insert_cards(
             uuid = card_data[0]  # UUID is always first
 
             # Check if card exists
-            cursor.execute("SELECT uuid FROM cards WHERE uuid = ?", (uuid,))
+            cursor.execute(SELECT_CARD_BY_UUID, (uuid,))
             existing = cursor.fetchone()
 
             try:
-                cursor.execute(
-                    f"""
-                    INSERT OR REPLACE INTO cards VALUES ({placeholders})
-                """,
-                    card_data,
-                )
+                cursor.execute(insert_query, card_data)
 
                 if existing:
                     updated_cards += 1
@@ -252,7 +255,7 @@ def get_existing_card_uuids(conn: sqlite3.Connection) -> set[str]:
         Set of card UUIDs
     """
     cursor = conn.cursor()
-    cursor.execute("SELECT uuid FROM cards")
+    cursor.execute(SELECT_ALL_CARD_UUIDS)
     return {row[0] for row in cursor.fetchall()}
 
 
@@ -266,7 +269,7 @@ def get_card_count(conn: sqlite3.Connection) -> int:
         Number of cards
     """
     cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM cards")
+    cursor.execute(GET_CARD_COUNT)
     return cursor.fetchone()[0]
 
 
@@ -280,14 +283,7 @@ def get_cards_by_set(conn: sqlite3.Connection) -> list[tuple[str, str, int]]:
         List of (set_code, set_name, count) tuples
     """
     cursor = conn.cursor()
-    cursor.execute(
-        """
-        SELECT set_code, set_name, COUNT(*) as card_count
-        FROM cards
-        GROUP BY set_code
-        ORDER BY set_code
-    """
-    )
+    cursor.execute(GET_CARDS_BY_SET)
     return cursor.fetchall()
 
 
@@ -301,14 +297,7 @@ def get_rarity_distribution(conn: sqlite3.Connection) -> list[tuple[str, int]]:
         List of (rarity, count) tuples
     """
     cursor = conn.cursor()
-    cursor.execute(
-        """
-        SELECT rarity, COUNT(*) as count
-        FROM cards
-        GROUP BY rarity
-        ORDER BY count DESC
-    """
-    )
+    cursor.execute(GET_RARITY_DISTRIBUTION)
     return cursor.fetchall()
 
 
@@ -344,7 +333,7 @@ def create_temp_table_from_list(
         values: List of values to insert
     """
     cursor = conn.cursor()
-    cursor.execute(f"CREATE TEMP TABLE {table_name} (name TEXT)")
+    cursor.execute(create_temp_table_query(table_name))
     cursor.executemany(
         f"INSERT INTO {table_name} VALUES (?)", [(value,) for value in values]
     )

@@ -14,7 +14,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from mtg_utils.constants import CARD_PRICES_TABLE_SCHEMA, CARDS_TABLE_SCHEMA
+from mtg_utils.sql import CARD_PRICES_TABLE_SCHEMA, CARDS_TABLE_SCHEMA
 
 
 @pytest.fixture

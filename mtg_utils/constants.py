@@ -23,79 +23,11 @@ JSON_SUBDIR = "json"
 DEFAULT_BATCH_SIZE = 1000
 PROGRESS_INTERVAL = 1000
 
-# Database schema
-CARDS_TABLE_SCHEMA = """
-    CREATE TABLE cards (
-        uuid TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        set_code TEXT NOT NULL,
-        set_name TEXT,
-        collection_name TEXT,
-        number TEXT,
-        mana_cost TEXT,
-        mana_value REAL,
-        type TEXT,
-        text TEXT,
-        power TEXT,
-        toughness TEXT,
-        loyalty TEXT,
-        colors TEXT,  -- JSON array
-        color_identity TEXT,  -- JSON array
-        rarity TEXT,
-        artist TEXT,
-        flavor_text TEXT,
-        converted_mana_cost REAL,
-        layout TEXT,
-        frame_version TEXT,
-        border_color TEXT,
-        is_reprint INTEGER,
-        printings TEXT,  -- JSON array
-        types TEXT,  -- JSON array
-        subtypes TEXT,  -- JSON array
-        supertypes TEXT,  -- JSON array
-        keywords TEXT,  -- JSON array
-        legalities TEXT,  -- JSON object
-        edhrecRank INTEGER,
-        edhrecSaltiness REAL
-    )
-"""
+# Configuration defaults
+DEFAULT_LOG_LEVEL = "INFO"
+DEFAULT_LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+VALID_LOG_LEVELS = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
-CARD_PRICES_TABLE_SCHEMA = """
-    CREATE TABLE card_prices (
-        uuid TEXT NOT NULL,
-        average_price REAL,
-        price_date DATE NOT NULL,
-        PRIMARY KEY (uuid, price_date),
-        FOREIGN KEY (uuid) REFERENCES cards(uuid)
-    )
-"""
-
-# Index definitions
-CARDS_INDEXES: list[tuple[str, str]] = [
-    ("idx_name", "CREATE INDEX IF NOT EXISTS idx_name ON cards(name)"),
-    ("idx_set_code", "CREATE INDEX IF NOT EXISTS idx_set_code ON cards(set_code)"),
-    (
-        "idx_collection",
-        "CREATE INDEX IF NOT EXISTS idx_collection ON cards(collection_name)",
-    ),
-    ("idx_rarity", "CREATE INDEX IF NOT EXISTS idx_rarity ON cards(rarity)"),
-    (
-        "idx_mana_value",
-        "CREATE INDEX IF NOT EXISTS idx_mana_value ON cards(mana_value)",
-    ),
-    ("idx_type", "CREATE INDEX IF NOT EXISTS idx_type ON cards(type)"),
-]
-
-PRICE_INDEXES: list[tuple[str, str]] = [
-    (
-        "idx_price_uuid",
-        "CREATE INDEX IF NOT EXISTS idx_price_uuid ON card_prices(uuid)",
-    ),
-    (
-        "idx_price_date",
-        "CREATE INDEX IF NOT EXISTS idx_price_date ON card_prices(price_date)",
-    ),
-]
 
 # Card field mappings (JSON key -> database column)
 CARD_FIELD_MAPPING = {

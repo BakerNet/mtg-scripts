@@ -16,10 +16,15 @@ from pathlib import Path
 import tqdm
 
 from mtg_utils import (
+    DownloadError,
     batch_insert_cards,
     create_database,
     create_price_table,
+    download_collection,
+    download_prices,
+    download_sets,
     ensure_column_exists,
+    get_available_collections,
     get_existing_card_uuids,
     get_project_paths,
     print_processing_summary,
@@ -28,25 +33,21 @@ from mtg_utils import (
     setup_environment,
     unzip_files,
     unzip_single_file,
+    validate_set_codes,
     verify_database,
     verify_price_data,
-)
-from mtg_utils.constants import CSV_HEADERS, DEFAULT_EXPORT_LIMIT
-from mtg_utils.database import create_temp_table_from_list
-from mtg_utils.download import (
-    DownloadError,
-    download_collection,
-    download_prices,
-    download_sets,
-    get_available_collections,
-    validate_set_codes,
-)
-from mtg_utils.exceptions import MTGProcessingError
-from mtg_utils.file_operations import read_card_list
-from mtg_utils.performance import (
     BatchProcessor,
     ConnectionPool,
     optimize_sqlite_connection,
+)
+from mtg_utils.constants import CSV_HEADERS, DEFAULT_EXPORT_LIMIT
+from mtg_utils.database import create_temp_table_from_list
+from mtg_utils.exceptions import MTGProcessingError
+from mtg_utils.io_operations import read_card_list
+from mtg_utils.sql import (
+    GET_TOP_CARDS_WITH_PRICES,
+    GET_CARDS_FROM_LIST,
+    INSERT_PRICE_QUERY,
 )
 from mtg_utils.reporting import (
     export_csv_preview,
@@ -233,10 +234,7 @@ def process_prices_command(args: argparse.Namespace) -> int:
                     if len(price_batch) >= batch_size:
                         cursor = conn.cursor()
                         cursor.executemany(
-                            """
-                            INSERT OR REPLACE INTO card_prices (uuid, average_price, price_date)
-                            VALUES (?, ?, ?)
-                        """,
+                            INSERT_PRICE_QUERY,
                             price_batch,
                         )
                         conn.commit()
@@ -246,10 +244,7 @@ def process_prices_command(args: argparse.Namespace) -> int:
                 if price_batch:
                     cursor = conn.cursor()
                     cursor.executemany(
-                        """
-                        INSERT OR REPLACE INTO card_prices (uuid, average_price, price_date)
-                        VALUES (?, ?, ?)
-                    """,
+                        INSERT_PRICE_QUERY,
                         price_batch,
                     )
                     conn.commit()
@@ -356,13 +351,7 @@ def export_top_command(args: argparse.Namespace) -> int:
         conn = sqlite3.connect(db_path)
 
         try:
-            query = """
-                SELECT c.name, c.set_code, c.set_name, cp.average_price
-                FROM cards c
-                JOIN card_prices cp ON c.uuid = cp.uuid
-                ORDER BY cp.average_price DESC
-                LIMIT ?
-            """
+            query = GET_TOP_CARDS_WITH_PRICES
 
             with tqdm.tqdm(desc="Querying database") as pbar:
                 cursor = conn.cursor()
@@ -434,25 +423,11 @@ def export_list_command(args: argparse.Namespace) -> int:
         try:
             with tqdm.tqdm(desc="Processing card list", total=3) as pbar:
                 # Create temporary table
-                create_temp_table_from_list(conn, "card_list", card_names)
+                create_temp_table_from_list(conn, "temp_card_list", card_names)
                 pbar.update(1)
 
                 # Query for cheapest versions
-                query = """
-                    WITH cheapest_cards AS (
-                        SELECT c.name, MIN(cp.average_price) as min_price
-                        FROM cards c
-                        JOIN card_prices cp ON c.uuid = cp.uuid
-                        JOIN card_list cl ON c.name = cl.name
-                        GROUP BY c.name
-                    )
-                    SELECT c.name, c.set_code, c.set_name, cp.average_price
-                    FROM cards c
-                    JOIN card_prices cp ON c.uuid = cp.uuid
-                    JOIN cheapest_cards cc ON c.name = cc.name AND cp.average_price = cc.min_price
-                    GROUP BY c.name
-                    ORDER BY cp.average_price DESC
-                """
+                query = GET_CARDS_FROM_LIST
 
                 cursor = conn.cursor()
                 cursor.execute(query)

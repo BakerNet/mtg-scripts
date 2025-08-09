@@ -10,11 +10,16 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
-from .database import (
-    execute_query,
-    get_card_count,
-    get_cards_by_set,
-    get_rarity_distribution,
+from .database import execute_query
+from .sql import (
+    GET_CARD_COUNT,
+    GET_CARDS_BY_SET,
+    GET_CARDS_WITHOUT_PRICES,
+    GET_PRICE_COUNT,
+    GET_PRICE_STATISTICS,
+    GET_TOP_PRICED_CARDS,
+    GET_BOTTOM_PRICED_CARDS,
+    GET_RARITY_DISTRIBUTION,
 )
 
 logger = logging.getLogger(__name__)
@@ -78,14 +83,14 @@ def verify_database(conn: sqlite3.Connection) -> dict[str, Any]:
     stats = {}
 
     # Get total card count
-    stats["total_cards"] = get_card_count(conn)
+    stats["total_cards"] = execute_query(conn, GET_CARD_COUNT)[0][0]
 
     # Get cards per set
-    sets_data = get_cards_by_set(conn)
+    sets_data = execute_query(conn, GET_CARDS_BY_SET)
     stats["total_sets"] = len(sets_data)
 
     # Get rarity distribution
-    rarity_data = get_rarity_distribution(conn)
+    rarity_data = execute_query(conn, GET_RARITY_DISTRIBUTION)
 
     print_section_header("DATABASE VERIFICATION")
     print(f"\nTotal cards in database: {stats['total_cards']:,}")
@@ -114,44 +119,20 @@ def verify_price_data(conn: sqlite3.Connection) -> dict[str, Any]:
     stats = {}
 
     # Get total price count
-    query = "SELECT COUNT(*) FROM card_prices"
-    stats["total_prices"] = execute_query(conn, query)[0][0]
+    stats["total_prices"] = execute_query(conn, GET_PRICE_COUNT)[0][0]
 
     # Get price statistics
-    query = """
-        SELECT
-            MIN(average_price) as min_price,
-            MAX(average_price) as max_price,
-            AVG(average_price) as avg_price,
-            COUNT(DISTINCT uuid) as unique_cards
-        FROM card_prices
-    """
-    price_stats = execute_query(conn, query)[0]
+    price_stats = execute_query(conn, GET_PRICE_STATISTICS)[0]
     stats["min_price"] = price_stats[0] or 0
     stats["max_price"] = price_stats[1] or 0
     stats["avg_price"] = price_stats[2] or 0
     stats["unique_cards_with_prices"] = price_stats[3]
 
     # Get sample of highest priced cards
-    query = """
-        SELECT c.name, c.set_code, cp.average_price
-        FROM card_prices cp
-        JOIN cards c ON cp.uuid = c.uuid
-        ORDER BY cp.average_price DESC
-        LIMIT 5
-    """
-    top_cards = execute_query(conn, query)
+    top_cards = execute_query(conn, GET_TOP_PRICED_CARDS, (5,))
 
     # Get sample of lowest priced cards (excluding 0)
-    query = """
-        SELECT c.name, c.set_code, cp.average_price
-        FROM card_prices cp
-        JOIN cards c ON cp.uuid = c.uuid
-        WHERE cp.average_price > 0
-        ORDER BY cp.average_price ASC
-        LIMIT 5
-    """
-    bottom_cards = execute_query(conn, query)
+    bottom_cards = execute_query(conn, GET_BOTTOM_PRICED_CARDS, (5,))
 
     print_section_header("PRICE DATA VERIFICATION")
     print(f"\nTotal price records: {stats['total_prices']:,}")
@@ -170,14 +151,7 @@ def verify_price_data(conn: sqlite3.Connection) -> dict[str, Any]:
             print(f"  ${price:8.2f} - {name} ({set_code})")
 
     # Check for cards without prices
-    query = """
-        SELECT COUNT(*)
-        FROM cards c
-        WHERE NOT EXISTS (
-            SELECT 1 FROM card_prices cp WHERE cp.uuid = c.uuid
-        )
-    """
-    stats["cards_without_prices"] = execute_query(conn, query)[0][0]
+    stats["cards_without_prices"] = execute_query(conn, GET_CARDS_WITHOUT_PRICES)[0][0]
     print(f"\nCards without price data: {stats['cards_without_prices']:,}")
 
     return stats
