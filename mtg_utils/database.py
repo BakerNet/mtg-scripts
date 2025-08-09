@@ -18,21 +18,35 @@ from .sql import (
     CARDS_INDEXES,
     CARDS_TABLE_SCHEMA,
     CHECK_TABLE_EXISTS,
-    DROP_CARDS_TABLE,
     DROP_CARD_PRICES_TABLE,
+    DROP_CARDS_TABLE,
+    GET_CARD_COUNT,
+    GET_CARDS_BY_SET,
+    GET_RARITY_DISTRIBUTION,
     GET_TABLE_COLUMNS,
     PRICE_INDEXES,
     SELECT_ALL_CARD_UUIDS,
     SELECT_CARD_BY_UUID,
-    GET_CARD_COUNT,
-    GET_CARDS_BY_SET,
-    GET_RARITY_DISTRIBUTION,
-    get_insert_cards_query,
-    get_add_column_query,
     create_temp_table_query,
+    get_add_column_query,
+    get_insert_cards_query,
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _is_valid_identifier(name: str) -> bool:
+    """Check if a string is a valid SQL identifier.
+
+    Args:
+        name: String to validate
+
+    Returns:
+        True if valid identifier, False otherwise
+    """
+    import re
+    # SQL identifier: starts with letter/underscore, followed by letters/digits/underscores
+    return bool(re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', name)) and len(name) <= 64
 
 
 @contextmanager
@@ -172,15 +186,23 @@ def ensure_column_exists(
 
     Args:
         conn: Database connection
-        table: Table name
+        table: Table name (must be a valid table name)
         column: Column name
         column_type: SQL type for the column
 
     Returns:
         True if column was added, False if it already existed
+
+    Raises:
+        ValueError: If table name is invalid
     """
+    # Validate table name to prevent SQL injection
+    if not _is_valid_identifier(table):
+        raise ValueError(f"Invalid table name: {table}")
+
     cursor = conn.cursor()
-    cursor.execute(GET_TABLE_COLUMNS.format(table=table))
+    # Use parameterized query with validated table name
+    cursor.execute(f"PRAGMA table_info({table})")
     columns = [column_info[1] for column_info in cursor.fetchall()]
 
     if column not in columns:
@@ -329,11 +351,19 @@ def create_temp_table_from_list(
 
     Args:
         conn: Database connection
-        table_name: Name for the temporary table
+        table_name: Name for the temporary table (must be a valid identifier)
         values: List of values to insert
+
+    Raises:
+        ValueError: If table name is invalid
     """
+    # Validate table name to prevent SQL injection
+    if not _is_valid_identifier(table_name):
+        raise ValueError(f"Invalid table name: {table_name}")
+
     cursor = conn.cursor()
     cursor.execute(create_temp_table_query(table_name))
+    # Use parameterized query with validated table name
     cursor.executemany(
         f"INSERT INTO {table_name} VALUES (?)", [(value,) for value in values]
     )

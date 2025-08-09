@@ -8,7 +8,7 @@ Requires Python 3.10+
 
 Main modules:
 - database: Database operations and connection management
-- io_operations: File I/O, downloads, and compression utilities  
+- io_operations: File I/O, downloads, and compression utilities
 - card_processing: Card data processing and validation
 - reporting: Progress reporting and verification utilities
 - performance: Performance optimization and retry logic

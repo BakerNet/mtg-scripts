@@ -52,12 +52,36 @@ class DatabaseError(MTGProcessingError):
     ):
         context = {}
         if query:
-            context["query"] = query[:100] + "..." if len(query) > 100 else query
+            # Sanitize query in error messages to prevent information disclosure
+            sanitized_query = self._sanitize_query(query)
+            context["query"] = sanitized_query[:100] + "..." if len(sanitized_query) > 100 else sanitized_query
         if table:
             context["table"] = table
         if original_error:
             context["original_error"] = str(original_error)
         super().__init__(message, context)
+
+    def _sanitize_query(self, query: str) -> str:
+        """Sanitize SQL query for error logging.
+
+        Args:
+            query: SQL query to sanitize
+
+        Returns:
+            Sanitized query string
+        """
+        # Remove potential sensitive data patterns
+        import re
+        sanitized = query
+
+        # Replace string literals with placeholders
+        sanitized = re.sub(r"'[^']*'", "'***'", sanitized)
+        sanitized = re.sub(r'"[^"]*"', '"***"', sanitized)
+
+        # Replace file paths
+        sanitized = re.sub(r'/[\w/.-]+', '/***', sanitized)
+
+        return sanitized
 
 
 class CardProcessingError(MTGProcessingError):

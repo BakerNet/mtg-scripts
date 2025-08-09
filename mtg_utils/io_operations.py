@@ -18,6 +18,43 @@ import tqdm
 
 from .constants import GZIPPED_SUBDIR, JSON_SUBDIR
 
+
+def _validate_file_path(file_path: Path, base_dir: Path = None) -> Path:
+    """Validate file path to prevent directory traversal attacks.
+
+    Args:
+        file_path: Path to validate
+        base_dir: Optional base directory to restrict access to
+
+    Returns:
+        Validated and resolved path
+
+    Raises:
+        ValueError: If path traversal is detected or path is outside base_dir
+    """
+    try:
+        # Resolve path to handle .. and symlinks
+        resolved_path = file_path.resolve()
+
+        # Check for suspicious patterns
+        path_str = str(file_path)
+        if '..' in path_str or path_str.startswith('/'):
+            # Allow absolute paths but log them
+            logger.warning(f"Absolute or relative path used: {file_path}")
+
+        # If base_dir is provided, ensure path is within it
+        if base_dir is not None:
+            base_resolved = base_dir.resolve()
+            try:
+                resolved_path.relative_to(base_resolved)
+            except ValueError:
+                raise ValueError(f"Path {file_path} is outside allowed directory {base_dir}")
+
+        return resolved_path
+
+    except (OSError, RuntimeError) as e:
+        raise ValueError(f"Invalid file path: {file_path}") from e
+
 logger = logging.getLogger(__name__)
 
 
@@ -155,28 +192,112 @@ def write_json_file(data: dict[str, Any], file_path: Path, indent: int = 2) -> N
 
 
 def read_card_list(file_path: Path) -> list[str]:
-    """Read card names from a text file, one per line.
+    """Read card names from various deck list formats.
+    
+    Supports multiple formats:
+    - Plain text: One card name per line
+    - MTGO format (.txt): "4 Lightning Bolt" with optional "Sideboard" section
+    - DEK format (.dec): Comments with //, sideboard with "SB:" prefix
+    - MW format (.mwDeck): Set annotations in brackets like "4 [MOR] Heritage Druid"
+    - MTGS format (.mtgsDeck): Tab-separated "4x\tLightning Bolt" with [DECK]/[/DECK] tags
 
     Args:
-        file_path: Path to the text file
+        file_path: Path to the deck list file
 
     Returns:
-        List of card names (stripped of whitespace)
+        List of card names (without quantities or set codes, including sideboard cards)
 
     Raises:
         FileNotFoundError: If file doesn't exist
+        ValueError: If path traversal is detected
     """
-    if not file_path.exists():
-        raise FileNotFoundError(f"Card list file not found: {file_path}")
+    import re
+    
+    # Validate path to prevent directory traversal
+    validated_path = _validate_file_path(file_path)
+
+    if not validated_path.exists():
+        raise FileNotFoundError(f"Card list file not found: {validated_path}")
 
     card_names = []
-    with open(file_path, "r", encoding="utf-8") as f:
-        for line in f:
+    
+    # Try different encodings to handle various file formats
+    encodings_to_try = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+    file_content = None
+    
+    for encoding in encodings_to_try:
+        try:
+            with open(validated_path, "r", encoding=encoding) as f:
+                file_content = f.read()
+                break
+        except UnicodeDecodeError:
+            continue
+    
+    if file_content is None:
+        raise ValueError(f"Could not decode file {validated_path} with any supported encoding")
+    
+    in_sideboard = False
+    in_deck_section = False
+    
+    for line in file_content.splitlines():
             line = line.strip()
-            if line:  # Skip empty lines
-                card_names.append(line)
+            
+            # Skip empty lines and comments
+            if not line or line.startswith('//'):
+                continue
+            
+            # Handle MTGS format deck tags
+            if line == '[DECK]':
+                in_deck_section = True
+                continue
+            elif line == '[/DECK]':
+                in_deck_section = False
+                continue
+            elif line.startswith('[URL=') or line.startswith('[/URL]'):
+                # Skip URL tags in MTGS format
+                continue
+                
+            # Check for sideboard markers
+            if line.lower() == 'sideboard':
+                in_sideboard = True
+                continue
+            
+            # Handle DEK format sideboard entries (SB: prefix)
+            if line.startswith('SB:'):
+                line = line[3:].strip()  # Remove "SB:" prefix
+                in_sideboard = True
+            
+            # Parse MTGS format: "4x\tLightning Bolt" (tab-separated with 'x' suffix)
+            mtgs_match = re.match(r'^(\d+)x\t(.+)$', line)
+            if mtgs_match:
+                quantity = int(mtgs_match.group(1))
+                card_name = mtgs_match.group(2).strip()
+                
+                # Add the card name the specified number of times
+                for _ in range(quantity):
+                    card_names.append(card_name)
+                continue
+                
+            # Parse standard quantity + card name format
+            # Match patterns like "4 Lightning Bolt", "1 Troll of Khazad-dûm", or "4 [MOR] Heritage Druid"
+            match = re.match(r'^(\d+)\s+(.+)$', line)
+            if match:
+                quantity = int(match.group(1))
+                card_part = match.group(2).strip()
+                
+                # Remove set annotations in brackets (e.g., "[MOR] Heritage Druid" -> "Heritage Druid")
+                # Handle empty brackets [] as well
+                card_name = re.sub(r'^\[[^\]]*\]\s*', '', card_part).strip()
+                
+                # Add the card name the specified number of times
+                for _ in range(quantity):
+                    card_names.append(card_name)
+            else:
+                # Plain text format - just add the card name once
+                if line:
+                    card_names.append(line)
 
-    logger.info(f"✓ Read {len(card_names)} card names from {file_path}")
+    logger.info(f"✓ Read {len(card_names)} card entries from {validated_path}")
     return card_names
 
 

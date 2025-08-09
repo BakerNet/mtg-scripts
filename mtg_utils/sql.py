@@ -57,7 +57,7 @@ CARD_PRICES_TABLE_SCHEMA = """
 """
 
 # =============================================================================
-# INDEX DEFINITIONS  
+# INDEX DEFINITIONS
 # =============================================================================
 
 CARDS_INDEXES: list[tuple[str, str]] = [
@@ -190,7 +190,7 @@ GET_CARDS_FROM_LIST = """
 
 PERFORMANCE_PRAGMAS = [
     "PRAGMA journal_mode=WAL",
-    "PRAGMA synchronous=NORMAL", 
+    "PRAGMA synchronous=NORMAL",
     "PRAGMA cache_size=10000",
     "PRAGMA temp_store=memory",
     "PRAGMA mmap_size=268435456",  # 256MB
@@ -199,7 +199,7 @@ PERFORMANCE_PRAGMAS = [
 TRANSACTION_PRAGMAS = [
     "PRAGMA journal_mode=WAL",
     "PRAGMA synchronous=NORMAL",
-    "PRAGMA cache_size=10000", 
+    "PRAGMA cache_size=10000",
     "PRAGMA temp_store=memory",
 ]
 
@@ -218,10 +218,10 @@ ROLLBACK_TRANSACTION = "ROLLBACK"
 
 def get_insert_cards_query(num_columns: int) -> str:
     """Generate INSERT OR REPLACE query for cards table.
-    
+
     Args:
         num_columns: Number of columns in the cards table
-        
+
     Returns:
         SQL INSERT OR REPLACE query with appropriate placeholders
     """
@@ -234,10 +234,10 @@ INSERT_PRICE_QUERY = "INSERT OR REPLACE INTO card_prices (uuid, average_price, p
 
 def get_batch_insert_prices_query(batch_size: int) -> str:
     """Generate batch INSERT query for card_prices.
-    
+
     Args:
         batch_size: Number of records to insert
-        
+
     Returns:
         SQL query for batch price insertion
     """
@@ -247,25 +247,29 @@ def get_batch_insert_prices_query(batch_size: int) -> str:
 
 def create_temp_table_query(table_name: str, column_definition: str = "name TEXT") -> str:
     """Generate CREATE TEMP TABLE query.
-    
+
     Args:
-        table_name: Name of temporary table
+        table_name: Name of temporary table (must be validated before calling)
         column_definition: Column definition (default: "name TEXT")
-        
+
     Returns:
         SQL CREATE TEMP TABLE query
+
+    Note:
+        This function assumes table_name has been validated by the caller.
+        Use _is_valid_identifier() to validate before calling.
     """
     return f"CREATE TEMP TABLE {table_name} ({column_definition})"
 
 
 def get_add_column_query(table: str, column: str, column_type: str) -> str:
     """Generate ALTER TABLE ADD COLUMN query.
-    
+
     Args:
         table: Table name
         column: Column name
         column_type: Column data type
-        
+
     Returns:
         SQL ALTER TABLE query
     """

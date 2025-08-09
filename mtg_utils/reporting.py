@@ -5,21 +5,20 @@ Requires Python 3.10+
 
 import csv
 import logging
-import math
 import sqlite3
 from pathlib import Path
 from typing import Any
 
 from .database import execute_query
 from .sql import (
+    GET_BOTTOM_PRICED_CARDS,
     GET_CARD_COUNT,
     GET_CARDS_BY_SET,
     GET_CARDS_WITHOUT_PRICES,
     GET_PRICE_COUNT,
     GET_PRICE_STATISTICS,
-    GET_TOP_PRICED_CARDS,
-    GET_BOTTOM_PRICED_CARDS,
     GET_RARITY_DISTRIBUTION,
+    GET_TOP_PRICED_CARDS,
 )
 
 logger = logging.getLogger(__name__)

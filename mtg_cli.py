@@ -16,6 +16,8 @@ from pathlib import Path
 import tqdm
 
 from mtg_utils import (
+    BatchProcessor,
+    ConnectionPool,
     DownloadError,
     batch_insert_cards,
     create_database,
@@ -27,6 +29,7 @@ from mtg_utils import (
     get_available_collections,
     get_existing_card_uuids,
     get_project_paths,
+    optimize_sqlite_connection,
     print_processing_summary,
     process_set_cards,
     read_json_file,
@@ -36,23 +39,20 @@ from mtg_utils import (
     validate_set_codes,
     verify_database,
     verify_price_data,
-    BatchProcessor,
-    ConnectionPool,
-    optimize_sqlite_connection,
 )
 from mtg_utils.constants import CSV_HEADERS, DEFAULT_EXPORT_LIMIT
 from mtg_utils.database import create_temp_table_from_list
 from mtg_utils.exceptions import MTGProcessingError
 from mtg_utils.io_operations import read_card_list
-from mtg_utils.sql import (
-    GET_TOP_CARDS_WITH_PRICES,
-    GET_CARDS_FROM_LIST,
-    INSERT_PRICE_QUERY,
-)
 from mtg_utils.reporting import (
     export_csv_preview,
     export_to_csv,
     print_collection_summary,
+)
+from mtg_utils.sql import (
+    GET_CARDS_FROM_LIST,
+    GET_TOP_CARDS_WITH_PRICES,
+    INSERT_PRICE_QUERY,
 )
 
 logger = logging.getLogger(__name__)
@@ -391,7 +391,16 @@ def export_list_command(args: argparse.Namespace) -> int:
     """Export cards from a text list to CSV."""
     try:
         db_path = get_project_paths("sets")["db"]
-        input_path = Path(args.input_file)
+
+        # Validate and resolve input file path
+        try:
+            input_path = Path(args.input_file).resolve()
+            # Basic validation - ensure it's a reasonable file path
+            if input_path.suffix.lower() not in ['.txt', '.csv', '.list', '.dec', '.mwdeck', '.mtgsdeck', '']:
+                logger.warning(f"Unusual file extension for card list: {input_path.suffix}")
+        except (OSError, ValueError) as e:
+            logger.error(f"Invalid input file path: {args.input_file} - {e}")
+            return 1
 
         if not db_path.exists():
             logger.error(f"Database not found: {db_path}")
@@ -403,7 +412,14 @@ def export_list_command(args: argparse.Namespace) -> int:
 
         # Generate output filename if not provided
         if args.output_file:
-            output_path = Path(args.output_file)
+            try:
+                output_path = Path(args.output_file).resolve()
+                # Ensure output has .csv extension
+                if not output_path.suffix.lower() == '.csv':
+                    output_path = output_path.with_suffix('.csv')
+            except (OSError, ValueError) as e:
+                logger.error(f"Invalid output file path: {args.output_file} - {e}")
+                return 1
         else:
             output_path = input_path.with_suffix("").with_suffix(".csv")
             output_path = output_path.parent / f"{output_path.stem}_prices.csv"
@@ -563,8 +579,11 @@ Examples:
     # Export top expensive cards
     mtg export-top 500
 
-    # Export from card list
+    # Export from card list (supports multiple formats)
     mtg export-list cube.txt --output cube_prices.csv
+    mtg export-list deck.dec
+    mtg export-list deck.mwDeck
+    mtg export-list deck.mtgsDeck
         """,
     )
 
@@ -606,9 +625,22 @@ Examples:
     top_parser = subparsers.add_parser(
         "export-top", help="Export top N most expensive cards to CSV"
     )
+
+    def validate_positive_int(value):
+        """Validate that a value is a positive integer."""
+        try:
+            ivalue = int(value)
+            if ivalue <= 0:
+                raise argparse.ArgumentTypeError(f"'{value}' must be a positive integer")
+            if ivalue > 100000:
+                raise argparse.ArgumentTypeError(f"'{value}' is too large (max: 100000)")
+            return ivalue
+        except ValueError:
+            raise argparse.ArgumentTypeError(f"'{value}' is not a valid integer")
+
     top_parser.add_argument(
         "limit",
-        type=int,
+        type=validate_positive_int,
         nargs="?",
         default=DEFAULT_EXPORT_LIMIT,
         help=f"Number of cards to export (default: {DEFAULT_EXPORT_LIMIT})",
@@ -616,10 +648,10 @@ Examples:
 
     # Export from list command
     list_parser = subparsers.add_parser(
-        "export-list", help="Export cards from a text list to CSV"
+        "export-list", help="Export cards from deck lists to CSV (supports .txt, .dec, .mwDeck, .mtgsDeck formats)"
     )
     list_parser.add_argument(
-        "input_file", help="Text file containing card names (one per line)"
+        "input_file", help="Deck list file (supports plain text, MTGO, .dec, .mwDeck, .mtgsDeck formats with quantities and set codes)"
     )
     list_parser.add_argument(
         "--output",
