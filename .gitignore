@@ -1,0 +1,7 @@
+*.json
+*.json.gz
+*.csv
+*.db
+analyses
+CLAUDE.md
+__pycache__

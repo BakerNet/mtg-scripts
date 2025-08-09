@@ -1,0 +1,48 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mtg-scripts"
+version = "1.0.0"
+description = "Download and process Magic: The Gathering card data from MTGJSON"
+requires-python = ">=3.10"
+dependencies = [
+    "tqdm>=4.65.0",     # Progress bars are nice to have
+    "urllib3>=2.0.0",   # For downloading files from MTGJSON
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=7.4.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+]
+
+[project.scripts]
+mtg = "mtg_cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["mtg_utils"]
+
+[tool.black]
+line-length = 88
+target-version = ["py310", "py311", "py312"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I"]  # Just the basics
+ignore = ["E501"]  # black handles line length
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-v"]
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m not integration')",
+]
