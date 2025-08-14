@@ -54,7 +54,11 @@ class DatabaseError(MTGProcessingError):
         if query:
             # Sanitize query in error messages to prevent information disclosure
             sanitized_query = self._sanitize_query(query)
-            context["query"] = sanitized_query[:100] + "..." if len(sanitized_query) > 100 else sanitized_query
+            context["query"] = (
+                sanitized_query[:100] + "..."
+                if len(sanitized_query) > 100
+                else sanitized_query
+            )
         if table:
             context["table"] = table
         if original_error:
@@ -72,6 +76,7 @@ class DatabaseError(MTGProcessingError):
         """
         # Remove potential sensitive data patterns
         import re
+
         sanitized = query
 
         # Replace string literals with placeholders
@@ -79,7 +84,7 @@ class DatabaseError(MTGProcessingError):
         sanitized = re.sub(r'"[^"]*"', '"***"', sanitized)
 
         # Replace file paths
-        sanitized = re.sub(r'/[\w/.-]+', '/***', sanitized)
+        sanitized = re.sub(r"/[\w/.-]+", "/***", sanitized)
 
         return sanitized
 

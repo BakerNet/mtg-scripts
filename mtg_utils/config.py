@@ -70,7 +70,9 @@ class MTGConfig:
     def setup_logging(self) -> None:
         """Set up logging based on configuration."""
         # Configure basic logging
-        logging.basicConfig(level=getattr(logging, self.log_level), format=DEFAULT_LOG_FORMAT)
+        logging.basicConfig(
+            level=getattr(logging, self.log_level), format=DEFAULT_LOG_FORMAT
+        )
 
         # Add file handler if specified
         if self.log_file:

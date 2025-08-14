@@ -1,140 +1,203 @@
-# MTG Data Processing Scripts
+# MTG Price Tracker
 
-Python scripts to download and process Magic: The Gathering card data from MTGJSON.
+A streamlined tool for downloading Magic: The Gathering card data and tracking current prices. Get the complete MTG database with a single command and query card prices with powerful filtering options.
 
-## Setup
+## ✨ Features
 
-### Requirements
+- **One-command setup** - Download and process everything with `mtg setup`
+- **Automatic updates** - Keep prices current with `mtg update`  
+- **Flexible filtering** - Query by sets, formats, or both
+- **Fast queries** - Optimized SQLite database with current prices only
+- **Complete database** - All MTG cards from all sets
 
-- Python 3.10+
-- Dependencies: `tqdm`, `urllib3` (for downloads)
+## 🚀 Quick Start
+
+### Installation
 
 ```bash
 git clone https://github.com/BakerNet/mtg-scripts
 cd mtg-scripts
-uv sync                           # Create virtual env and download deps
-source .venv/bin/activate         # Activate virtual env
-uv tool install .                 # Install mtg command to virtual env from source
+uv sync                    # Install dependencies
+source .venv/bin/activate  # Activate virtual environment
+uv tool install .          # Install mtg command
 ```
 
-## Quick Start
+### Usage
 
 ```bash
-# 1. Download data from MTGJSON
-mtg download-sets ZEN WWK ROE     # Download specific sets
-mtg download-collection Legacy    # OR download format collection
-mtg download-prices               # Download price data
+# Initial setup (downloads ~500MB, takes 2-3 minutes)
+mtg setup
 
-# 2. Process the data
-mtg process-cards                 # Process card data first
-mtg process-collections           # OR process format collection first
-mtg process-prices                # Then process prices
+# Keep data current (run weekly/monthly)
+mtg update
 
-# 3. Export results
-mtg export-top 100               # Top 100 expensive cards
-mtg export-list my_cube.txt      # Price a specific list of cards
+# Export expensive cards
+mtg export-top 100
+mtg export-top 50 --sets ZEN,WWK,ROE
+mtg export-top 25 --formats Legacy,Modern
+
+# Price your card lists
+mtg export-list cube.txt
+mtg export-list deck.txt --sets ZEN,WWK --formats Legacy
 ```
 
-## Available Commands
+That's it! Two commands for data management, powerful queries for analysis.
 
-### Download Commands
-- `mtg download-sets SET1 SET2 ...` - Download individual sets by code
-- `mtg download-collection FORMAT` - Download collection (Legacy, Modern, Vintage, etc.)
-- `mtg download-prices` - Download AllPrices.json.gz
+## 📖 Commands
 
-### Processing Commands
-- `mtg process-cards` - Process card data from sets
-- `mtg process-collections` - Process collection files 
-- `mtg process-prices` - Process price data
+### Core Commands
+
+| Command | Description |
+|---------|-------------|
+| `mtg setup` | Complete initial setup - downloads all cards and prices, creates database |
+| `mtg setup --fresh` | Clean setup from scratch (removes existing data) |
+| `mtg update` | Update database with latest cards and prices |
 
 ### Export Commands
-- `mtg export-top N` - Export top N expensive cards
-- `mtg export-list FILE` - Price cards from text list
 
-## File Structure
+| Command | Description |
+|---------|-------------|
+| `mtg export-top N` | Export top N most expensive cards |
+| `mtg export-list FILE` | Price cards from a text/deck list |
+
+### Filtering Options
+
+Both export commands support filtering:
+
+- `--sets SET1,SET2,SET3` - Filter by set codes (e.g., ZEN,WWK,ROE)
+- `--formats FORMAT1,FORMAT2` - Filter by format legality (e.g., Legacy,Modern,Standard)
+
+Filters can be combined:
+```bash
+mtg export-top 50 --sets ZEN,WWK --formats Legacy
+```
+
+## 📁 File Structure
 
 ```
 data/
 ├── sets/
-│   ├── gzipped/        # Downloaded .json.gz set files
-│   └── json/           # Extracted .json files
-├── collections/
-│   ├── gzipped/        # Downloaded collection files (Legacy, Modern, etc.)
-│   └── json/           # Extracted collection files
-└── prices/
-    ├── gzipped/        # AllPrices.json.gz
-    └── json/           # Extracted price data
+│   ├── gzipped/        # AllPrintings.json.gz (complete card database)
+│   └── json/           # Extracted JSON
+├── prices/
+│   ├── gzipped/        # AllPrices.json.gz
+│   └── json/           # Extracted price data
 db/
-└── cards.db           # SQLite database (auto-created)
+└── cards.db            # SQLite database with all cards and current prices
 ```
 
-## Command Options
+## 🎯 Example Workflows
+
+### Track Expensive Cards in Your Favorite Sets
+```bash
+mtg setup
+mtg export-top 100 --sets NEO,DMU,BRO > modern_sets_expensive.csv
+```
+
+### Price a Cube List
+```bash
+mtg setup
+mtg export-list my_vintage_cube.txt --formats Vintage
+```
+
+### Monitor Price Changes
+```bash
+# Initial setup
+mtg setup
+mtg export-top 1000 > prices_january.csv
+
+# One month later
+mtg update
+mtg export-top 1000 > prices_february.csv
+# Compare the CSVs to see price changes
+```
+
+### Find Budget Cards for a Format
+```bash
+mtg setup
+# Export all Legacy-legal cards, then filter in spreadsheet for < $1
+mtg export-top 10000 --formats Legacy > legacy_cards.csv
+```
+
+## 🔧 Configuration
+
+### Environment Variables
 
 ```bash
-# Clear existing data before download
-mtg download-sets ZEN WWK --fresh
-mtg download-collection Legacy --fresh
-mtg download-prices --fresh
-
-# Start fresh processing (deletes existing database data)
-mtg process-cards --fresh
-mtg process-collections --fresh
-
-# Debug mode
-mtg --log-level DEBUG process-cards
-
-# Custom export size
-mtg export-top 500
-
-# Custom output file
-mtg export-list cube.txt --output my_cube_prices.csv
+MTG_BATCH_SIZE=5000       # Database batch size (default: 1000)
+MTG_LOG_LEVEL=DEBUG       # Logging level (DEBUG, INFO, WARNING, ERROR)
+MTG_LOG_FILE=mtg.log      # Log to file instead of console
+MTG_DATA_DIR=./data       # Custom data directory
+MTG_DB_DIR=./db           # Custom database directory
 ```
 
-## Available Collections
+### Supported Deck List Formats
 
-- Legacy, Modern, Vintage, Standard
-- Pioneer, Commander, Historic
-- Alchemy, Explorer
+The `export-list` command supports multiple deck list formats:
+- Plain text (one card per line)
+- MTGO format (e.g., "4 Lightning Bolt")
+- .dec format with sideboard support
+- .mwDeck format (MagicWorkstation)
+- .mtgsDeck format (MTG Salvation)
 
-## Environment Variables
+## 📊 Database Schema
 
+The tool maintains a simple, efficient database:
+
+- **cards** table - All MTG cards with complete details
+  - UUID (primary key), name, set_code, mana_cost, type, rarity, etc.
+  - Legalities stored as JSON for format filtering
+  
+- **card_prices** table - Current TCGPlayer prices only
+  - UUID (primary key), average_price, last_updated
+  - No historical data - keeps queries fast and storage minimal
+
+## 🛠 Development
+
+### Requirements
+- Python 3.10+
+- uv for dependency management
+
+### Testing & Quality
 ```bash
-# Processing
-export MTG_BATCH_SIZE=2000          # Batch size for processing
-export MTG_LOG_LEVEL=DEBUG          # Logging level
-export MTG_LOG_FILE=mtg.log         # Log to file instead of console
-
-# Custom directories (optional)
-export MTG_DATA_DIR=./custom_data   # Change data directory
-export MTG_DB_DIR=./custom_db       # Change database directory
+pytest                     # Run tests
+pytest -m "not integration"  # Skip integration tests
+ruff format .              # Format code
+ruff check .               # Lint code
 ```
 
-## Examples
-
-```bash
-# Download and process Vintage format
-mtg download-collection Vintage --fresh
-mtg process-collections
-
-# Get price data and export expensive cards
-mtg download-prices --fresh
-mtg process-prices
-mtg export-top 200
-
-# Price your Vintage cube
-mtg export-list my_cube.txt
+### Project Structure
+```
+mtg_cli.py                 # Main CLI entry point
+mtg_utils/                 # Core library modules
+├── database.py            # Database operations
+├── io_operations.py       # File I/O and downloads
+├── card_processing.py     # Card data processing
+├── sql.py                 # SQL queries and schemas
+└── ...
+tests/                     # Test suite
 ```
 
-## Development
+## 📝 Notes
 
-```bash
-pytest          # Run tests
-black .         # Format code
-ruff check .    # Lint
-```
+- **Data source**: All card data from [MTGJSON](https://mtgjson.com)
+- **Prices**: TCGPlayer average prices, updated daily by MTGJSON
+- **Database size**: ~500MB after initial setup
+- **Update frequency**: Run `mtg update` weekly or monthly for current prices
+- **Performance**: Processes ~80,000 cards in under a minute
 
-## Notes
+## 🤝 Contributing
 
-- Always run card/collection processing before price processing
-- The `--fresh` flag on processing commands only clears database data, not files
-- Downloaded files are cached - use download `--fresh` to re-download
+Pull requests welcome! Please ensure:
+- Tests pass (`pytest`)
+- Code is formatted (`ruff format .`)
+- Linting passes (`ruff check .`)
+
+## 📄 License
+
+MIT License - see LICENSE file for details
+
+## 🙏 Credits
+
+- Card data provided by [MTGJSON](https://mtgjson.com)
+- Price data from TCGPlayer via MTGJSON

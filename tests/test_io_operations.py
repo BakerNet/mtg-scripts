@@ -3,8 +3,6 @@
 Requires Python 3.10+
 """
 
-import tempfile
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -19,9 +17,9 @@ class TestReadCardList:
         """Test reading plain text format (one card per line)."""
         test_file = temp_dir / "plain.txt"
         test_file.write_text("Lightning Bolt\nGiant Growth\nCounterspell\n")
-        
+
         result = read_card_list(test_file)
-        
+
         assert result == ["Lightning Bolt", "Giant Growth", "Counterspell"]
 
     def test_mtgo_format_with_quantities(self, temp_dir):
@@ -30,17 +28,23 @@ class TestReadCardList:
 3 Giant Growth
 1 Black Lotus
 2 Mox Pearl"""
-        
+
         test_file = temp_dir / "mtgo.txt"
         test_file.write_text(test_content)
-        
+
         result = read_card_list(test_file)
-        
+
         expected = [
-            "Lightning Bolt", "Lightning Bolt", "Lightning Bolt", "Lightning Bolt",
-            "Giant Growth", "Giant Growth", "Giant Growth", 
+            "Lightning Bolt",
+            "Lightning Bolt",
+            "Lightning Bolt",
+            "Lightning Bolt",
+            "Giant Growth",
+            "Giant Growth",
+            "Giant Growth",
             "Black Lotus",
-            "Mox Pearl", "Mox Pearl"
+            "Mox Pearl",
+            "Mox Pearl",
         ]
         assert result == expected
 
@@ -53,18 +57,25 @@ class TestReadCardList:
 Sideboard
 1 Pyroclasm
 2 Nihil Spellbomb"""
-        
+
         test_file = temp_dir / "mtgo_sideboard.txt"
         test_file.write_text(test_content)
-        
+
         result = read_card_list(test_file)
-        
+
         expected = [
-            "Abhorrent Oculus", "Abhorrent Oculus", "Abhorrent Oculus", "Abhorrent Oculus",
-            "Emperor of Bones", "Emperor of Bones", "Emperor of Bones", "Emperor of Bones",
+            "Abhorrent Oculus",
+            "Abhorrent Oculus",
+            "Abhorrent Oculus",
+            "Abhorrent Oculus",
+            "Emperor of Bones",
+            "Emperor of Bones",
+            "Emperor of Bones",
+            "Emperor of Bones",
             "Spell Pierce",
             "Pyroclasm",
-            "Nihil Spellbomb", "Nihil Spellbomb"
+            "Nihil Spellbomb",
+            "Nihil Spellbomb",
         ]
         assert result == expected
 
@@ -80,18 +91,25 @@ Sideboard
 
 SB: 1 Pyroclasm
 SB: 2 Nihil Spellbomb"""
-        
+
         test_file = temp_dir / "deck.dec"
         test_file.write_text(test_content)
-        
+
         result = read_card_list(test_file)
-        
+
         expected = [
-            "Abhorrent Oculus", "Abhorrent Oculus", "Abhorrent Oculus", "Abhorrent Oculus",
-            "Emperor of Bones", "Emperor of Bones", "Emperor of Bones", "Emperor of Bones",
+            "Abhorrent Oculus",
+            "Abhorrent Oculus",
+            "Abhorrent Oculus",
+            "Abhorrent Oculus",
+            "Emperor of Bones",
+            "Emperor of Bones",
+            "Emperor of Bones",
+            "Emperor of Bones",
             "Spell Pierce",
             "Pyroclasm",
-            "Nihil Spellbomb", "Nihil Spellbomb"
+            "Nihil Spellbomb",
+            "Nihil Spellbomb",
         ]
         assert result == expected
 
@@ -100,17 +118,13 @@ SB: 2 Nihil Spellbomb"""
         test_content = """1 Troll of Khazad-dûm
 2 Jötun Grunt
 1 Æther Vial"""
-        
+
         test_file = temp_dir / "unicode.txt"
-        test_file.write_text(test_content, encoding='utf-8')
-        
+        test_file.write_text(test_content, encoding="utf-8")
+
         result = read_card_list(test_file)
-        
-        expected = [
-            "Troll of Khazad-dûm",
-            "Jötun Grunt", "Jötun Grunt",
-            "Æther Vial"
-        ]
+
+        expected = ["Troll of Khazad-dûm", "Jötun Grunt", "Jötun Grunt", "Æther Vial"]
         assert result == expected
 
     def test_empty_lines_and_whitespace(self, temp_dir):
@@ -118,21 +132,25 @@ SB: 2 Nihil Spellbomb"""
         test_content = """
 4 Lightning Bolt
 
-2 Giant Growth   
+2 Giant Growth
 
 1 Black Lotus
 
 """
-        
+
         test_file = temp_dir / "whitespace.txt"
         test_file.write_text(test_content)
-        
+
         result = read_card_list(test_file)
-        
+
         expected = [
-            "Lightning Bolt", "Lightning Bolt", "Lightning Bolt", "Lightning Bolt",
-            "Giant Growth", "Giant Growth",
-            "Black Lotus"
+            "Lightning Bolt",
+            "Lightning Bolt",
+            "Lightning Bolt",
+            "Lightning Bolt",
+            "Giant Growth",
+            "Giant Growth",
+            "Black Lotus",
         ]
         assert result == expected
 
@@ -141,22 +159,25 @@ SB: 2 Nihil Spellbomb"""
         test_content = """4 Lightning Bolt
 SIDEBOARD
 1 Pyroclasm"""
-        
+
         test_file = temp_dir / "mixed_case.txt"
         test_file.write_text(test_content)
-        
+
         result = read_card_list(test_file)
-        
+
         expected = [
-            "Lightning Bolt", "Lightning Bolt", "Lightning Bolt", "Lightning Bolt",
-            "Pyroclasm"
+            "Lightning Bolt",
+            "Lightning Bolt",
+            "Lightning Bolt",
+            "Lightning Bolt",
+            "Pyroclasm",
         ]
         assert result == expected
 
     def test_file_not_found(self, temp_dir):
         """Test error handling for non-existent files."""
         non_existent_file = temp_dir / "does_not_exist.txt"
-        
+
         with pytest.raises(FileNotFoundError, match="Card list file not found"):
             read_card_list(non_existent_file)
 
@@ -164,9 +185,9 @@ SIDEBOARD
         """Test reading empty files."""
         test_file = temp_dir / "empty.txt"
         test_file.write_text("")
-        
+
         result = read_card_list(test_file)
-        
+
         assert result == []
 
     def test_only_comments_and_empty_lines(self, temp_dir):
@@ -176,12 +197,12 @@ SIDEBOARD
 //Another comment
 
 """
-        
+
         test_file = temp_dir / "only_comments.dec"
         test_file.write_text(test_content)
-        
+
         result = read_card_list(test_file)
-        
+
         assert result == []
 
     def test_zero_quantity_cards(self, temp_dir):
@@ -189,15 +210,19 @@ SIDEBOARD
         test_content = """4 Lightning Bolt
 0 Giant Growth
 2 Counterspell"""
-        
+
         test_file = temp_dir / "zero_quantity.txt"
         test_file.write_text(test_content)
-        
+
         result = read_card_list(test_file)
-        
+
         expected = [
-            "Lightning Bolt", "Lightning Bolt", "Lightning Bolt", "Lightning Bolt",
-            "Counterspell", "Counterspell"
+            "Lightning Bolt",
+            "Lightning Bolt",
+            "Lightning Bolt",
+            "Lightning Bolt",
+            "Counterspell",
+            "Counterspell",
         ]
         assert result == expected
 
@@ -205,24 +230,24 @@ SIDEBOARD
         """Test handling of large card quantities."""
         test_content = """100 Lightning Bolt
 1 Black Lotus"""
-        
+
         test_file = temp_dir / "large_quantities.txt"
         test_file.write_text(test_content)
-        
+
         result = read_card_list(test_file)
-        
+
         assert len(result) == 101
         assert result[:100] == ["Lightning Bolt"] * 100
         assert result[100] == "Black Lotus"
 
-    @patch('mtg_utils.io_operations.logger')
+    @patch("mtg_utils.io_operations.logger")
     def test_logging_output(self, mock_logger, temp_dir):
         """Test that appropriate logging messages are generated."""
         test_file = temp_dir / "test.txt"
         test_file.write_text("4 Lightning Bolt\n2 Giant Growth")
-        
-        result = read_card_list(test_file)
-        
+
+        read_card_list(test_file)
+
         mock_logger.info.assert_called_once()
         call_args = mock_logger.info.call_args[0][0]
         assert "Read 6 card entries" in call_args
@@ -262,15 +287,15 @@ Sideboard
 2 Meltdown
 1 Into the Flood Maw
 2 Harbinger of the Seas"""
-        
+
         test_file = temp_dir / "realistic_example.txt"
         test_file.write_text(test_content)
-        
+
         result = read_card_list(test_file)
-        
+
         # Count total cards: main deck (60) + sideboard (15) = 75
         assert len(result) == 75
-        
+
         # Verify specific high-quantity cards
         assert result.count("Abhorrent Oculus") == 4
         assert result.count("Consign to Memory") == 4
@@ -313,15 +338,15 @@ SB: 4 Consign to Memory
 SB: 2 Meltdown
 SB: 1 Into the Flood Maw
 SB: 2 Harbinger of the Seas"""
-        
+
         test_file = temp_dir / "realistic_example.dec"
         test_file.write_text(test_content)
-        
+
         result = read_card_list(test_file)
-        
+
         # Count total cards: main deck (60) + sideboard (15) = 75
         assert len(result) == 75
-        
+
         # Verify specific high-quantity cards
         assert result.count("Abhorrent Oculus") == 4
         assert result.count("Consign to Memory") == 4
@@ -332,16 +357,20 @@ SB: 2 Harbinger of the Seas"""
         test_content = """4 [MOR] Heritage Druid
 1 [A] Black Lotus
 2 [ZEN] Verdant Catacombs"""
-        
+
         test_file = temp_dir / "set_annotations.txt"
         test_file.write_text(test_content)
-        
+
         result = read_card_list(test_file)
-        
+
         expected = [
-            "Heritage Druid", "Heritage Druid", "Heritage Druid", "Heritage Druid",
+            "Heritage Druid",
+            "Heritage Druid",
+            "Heritage Druid",
+            "Heritage Druid",
             "Black Lotus",
-            "Verdant Catacombs", "Verdant Catacombs"
+            "Verdant Catacombs",
+            "Verdant Catacombs",
         ]
         assert result == expected
 
@@ -349,15 +378,19 @@ SB: 2 Harbinger of the Seas"""
         """Test handling of empty brackets."""
         test_content = """4 [] Lightning Bolt
 2 [] Giant Growth"""
-        
+
         test_file = temp_dir / "empty_brackets.txt"
         test_file.write_text(test_content)
-        
+
         result = read_card_list(test_file)
-        
+
         expected = [
-            "Lightning Bolt", "Lightning Bolt", "Lightning Bolt", "Lightning Bolt",
-            "Giant Growth", "Giant Growth"
+            "Lightning Bolt",
+            "Lightning Bolt",
+            "Lightning Bolt",
+            "Lightning Bolt",
+            "Giant Growth",
+            "Giant Growth",
         ]
         assert result == expected
 
@@ -368,17 +401,21 @@ SB: 2 Harbinger of the Seas"""
 
 SB: 2 [RTR] Abrupt Decay
 SB: 1 [TE] Choke"""
-        
+
         test_file = temp_dir / "set_annotations_sb.mwDeck"
         test_file.write_text(test_content)
-        
+
         result = read_card_list(test_file)
-        
+
         expected = [
-            "Heritage Druid", "Heritage Druid", "Heritage Druid", "Heritage Druid",
+            "Heritage Druid",
+            "Heritage Druid",
+            "Heritage Druid",
+            "Heritage Druid",
             "Black Lotus",
-            "Abrupt Decay", "Abrupt Decay",
-            "Choke"
+            "Abrupt Decay",
+            "Abrupt Decay",
+            "Choke",
         ]
         assert result == expected
 
@@ -388,17 +425,23 @@ SB: 1 [TE] Choke"""
 2 Lightning Bolt
 1 [A] Black Lotus
 3 Giant Growth"""
-        
+
         test_file = temp_dir / "mixed_formats.txt"
         test_file.write_text(test_content)
-        
+
         result = read_card_list(test_file)
-        
+
         expected = [
-            "Heritage Druid", "Heritage Druid", "Heritage Druid", "Heritage Druid",
-            "Lightning Bolt", "Lightning Bolt",
+            "Heritage Druid",
+            "Heritage Druid",
+            "Heritage Druid",
+            "Heritage Druid",
+            "Lightning Bolt",
+            "Lightning Bolt",
             "Black Lotus",
-            "Giant Growth", "Giant Growth", "Giant Growth"
+            "Giant Growth",
+            "Giant Growth",
+            "Giant Growth",
         ]
         assert result == expected
 
@@ -408,17 +451,17 @@ SB: 1 [TE] Choke"""
 1 [M15] Reclamation Sage
 1 [FUT] Dryad Arbor
 1 [AVR] Craterhoof Behemoth"""
-        
+
         test_file = temp_dir / "complex_sets.txt"
         test_file.write_text(test_content)
-        
+
         result = read_card_list(test_file)
-        
+
         expected = [
             "Lightning Bolt",
-            "Reclamation Sage", 
+            "Reclamation Sage",
             "Dryad Arbor",
-            "Craterhoof Behemoth"
+            "Craterhoof Behemoth",
         ]
         assert result == expected
 
@@ -460,25 +503,25 @@ SB:  3 [] Endurance
 SB:  2 [] Force of Vigor
 SB:  1 [] Keen-Eyed Curator
 SB:  1 [M15] Reclamation Sage"""
-        
+
         test_file = temp_dir / "elfballz.mwDeck"
         test_file.write_text(test_content)
-        
+
         result = read_card_list(test_file)
-        
+
         # Count total cards: 60 + 15 = 75
         assert len(result) == 75
-        
+
         # Verify set annotations are stripped
         assert result.count("Heritage Druid") == 4
         assert result.count("Allosaurus Shepherd") == 4
         assert result.count("Abrupt Decay") == 3
         assert result.count("Gaea's Cradle") == 4
-        
+
         # Verify no set codes remain in card names
         for card_name in result:
-            assert not '[' in card_name
-            assert not ']' in card_name
+            assert "[" not in card_name
+            assert "]" not in card_name
 
     def test_mtgs_format_basic(self, temp_dir):
         """Test basic MTGS format with tab-separated values."""
@@ -487,16 +530,20 @@ SB:  1 [M15] Reclamation Sage"""
 2x\tGiant Growth
 1x\tBlack Lotus
 [/DECK]"""
-        
+
         test_file = temp_dir / "mtgs_basic.mtgsDeck"
         test_file.write_text(test_content)
-        
+
         result = read_card_list(test_file)
-        
+
         expected = [
-            "Lightning Bolt", "Lightning Bolt", "Lightning Bolt", "Lightning Bolt",
-            "Giant Growth", "Giant Growth",
-            "Black Lotus"
+            "Lightning Bolt",
+            "Lightning Bolt",
+            "Lightning Bolt",
+            "Lightning Bolt",
+            "Giant Growth",
+            "Giant Growth",
+            "Black Lotus",
         ]
         assert result == expected
 
@@ -510,17 +557,23 @@ Sideboard
 3x\tAbrupt Decay
 1x\tPyroclasm
 [/DECK]"""
-        
+
         test_file = temp_dir / "mtgs_sideboard.mtgsDeck"
         test_file.write_text(test_content)
-        
+
         result = read_card_list(test_file)
-        
+
         expected = [
-            "Lightning Bolt", "Lightning Bolt", "Lightning Bolt", "Lightning Bolt",
-            "Giant Growth", "Giant Growth",
-            "Abrupt Decay", "Abrupt Decay", "Abrupt Decay",
-            "Pyroclasm"
+            "Lightning Bolt",
+            "Lightning Bolt",
+            "Lightning Bolt",
+            "Lightning Bolt",
+            "Giant Growth",
+            "Giant Growth",
+            "Abrupt Decay",
+            "Abrupt Decay",
+            "Abrupt Decay",
+            "Pyroclasm",
         ]
         assert result == expected
 
@@ -531,15 +584,19 @@ Sideboard
 2x\tGiant Growth
 [/DECK]
 [URL="http://example.com"]Link to deck[/URL]"""
-        
+
         test_file = temp_dir / "mtgs_url.mtgsDeck"
         test_file.write_text(test_content)
-        
+
         result = read_card_list(test_file)
-        
+
         expected = [
-            "Lightning Bolt", "Lightning Bolt", "Lightning Bolt", "Lightning Bolt",
-            "Giant Growth", "Giant Growth"
+            "Lightning Bolt",
+            "Lightning Bolt",
+            "Lightning Bolt",
+            "Lightning Bolt",
+            "Giant Growth",
+            "Giant Growth",
         ]
         assert result == expected
 
@@ -576,15 +633,15 @@ Sideboard
 2x\tRemand
 [/DECK]
 [URL="http://tappedout.net/mtg-decks/deathrender-a-combo-concept/"]Link to deck @ TappedOut.net[/URL]"""
-        
+
         test_file = temp_dir / "realistic_mtgs.mtgsDeck"
         test_file.write_text(test_content)
-        
+
         result = read_card_list(test_file)
-        
+
         # Count total cards: 60 + 15 = 75
         assert len(result) == 75
-        
+
         # Verify specific card counts
         assert result.count("Ancient Stirrings") == 4
         assert result.count("Emrakul, the Aeons Torn") == 3
@@ -602,17 +659,22 @@ Sideboard
 SB: 2x\tAbrupt Decay
 SB: 1 Force of Will
 [/DECK]"""
-        
+
         test_file = temp_dir / "mixed_formats.txt"
         test_file.write_text(test_content)
-        
+
         result = read_card_list(test_file)
-        
+
         expected = [
-            "Ancient Stirrings", "Ancient Stirrings", "Ancient Stirrings", "Ancient Stirrings",
-            "Lightning Bolt", "Lightning Bolt",
+            "Ancient Stirrings",
+            "Ancient Stirrings",
+            "Ancient Stirrings",
+            "Ancient Stirrings",
+            "Lightning Bolt",
+            "Lightning Bolt",
             "Heritage Druid",
-            "Abrupt Decay", "Abrupt Decay",
-            "Force of Will"
+            "Abrupt Decay",
+            "Abrupt Decay",
+            "Force of Will",
         ]
         assert result == expected

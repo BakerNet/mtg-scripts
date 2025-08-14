@@ -11,11 +11,7 @@ import json
 from mtg_utils.card_processing import (
     calculate_average_price,
     extract_tcgplayer_price,
-    filter_cards_by_format,
-    merge_card_duplicates,
     prepare_card_data,
-    process_price_batch,
-    process_set_cards,
     validate_card_data,
 )
 
@@ -79,28 +75,6 @@ class TestCardProcessing:
 
         assert result[22] == 1  # is_reprint should be 1 for True
 
-    def test_process_set_cards(self, sample_set_data: dict):
-        """Test processing cards from a set."""
-        cards_data = process_set_cards(sample_set_data)
-
-        assert len(cards_data) == 2  # Two cards in sample data
-
-        # Check first card
-        first_card = cards_data[0]
-        assert first_card[1] == "Lightning Bolt"  # name
-        assert first_card[2] == "TST"  # set_code
-        assert first_card[3] == "Test Set"  # set_name
-
-    def test_process_set_cards_with_collection(self, sample_set_data: dict):
-        """Test processing cards with collection name."""
-        collection_name = "My Collection"
-        cards_data = process_set_cards(sample_set_data, collection_name)
-
-        assert len(cards_data) == 2
-
-        # Check collection name is set
-        for card_data in cards_data:
-            assert card_data[4] == collection_name  # collection_name
 
     def test_calculate_average_price(self):
         """Test price calculation."""
@@ -149,32 +123,6 @@ class TestCardProcessing:
         card_price_data = {"paper": {"tcgplayer": {"retail": {}}}}
         assert extract_tcgplayer_price(card_price_data) is None
 
-    def test_process_price_batch(self, sample_price_data: dict):
-        """Test processing a batch of price data."""
-        existing_uuids = {"test-uuid-123", "test-uuid-456"}
-        price_entries = sample_price_data["data"]
-
-        price_data_list = process_price_batch(price_entries, existing_uuids)
-
-        assert len(price_data_list) == 2
-
-        # Check structure of price data
-        for uuid, price, date in price_data_list:
-            assert uuid in existing_uuids
-            assert isinstance(price, float)
-            assert price > 0
-            assert isinstance(date, str)
-
-    def test_process_price_batch_filtered(self, sample_price_data: dict):
-        """Test processing price batch with filtering."""
-        # Only include one UUID in existing set
-        existing_uuids = {"test-uuid-123"}
-        price_entries = sample_price_data["data"]
-
-        price_data_list = process_price_batch(price_entries, existing_uuids)
-
-        assert len(price_data_list) == 1
-        assert price_data_list[0][0] == "test-uuid-123"
 
     def test_validate_card_data_valid(self, sample_card_data: dict):
         """Test validating valid card data."""
@@ -198,66 +146,6 @@ class TestCardProcessing:
         card_data = {"uuid": "test", "name": None}
         assert validate_card_data(card_data) is False
 
-    def test_merge_card_duplicates(self):
-        """Test merging duplicate cards."""
-        cards = [
-            {"uuid": "uuid1", "name": "Card 1", "text": "Short"},
-            {"uuid": "uuid2", "name": "Card 2", "text": "Text"},
-            {
-                "uuid": "uuid1",
-                "name": "Card 1",
-                "text": "Much longer text with more information",
-            },
-        ]
-
-        unique_cards = merge_card_duplicates(cards)
-
-        assert len(unique_cards) == 2
-
-        # Should keep the longer version of uuid1
-        card1 = next(card for card in unique_cards if card["uuid"] == "uuid1")
-        assert "Much longer text" in card1["text"]
-
-    def test_filter_cards_by_format(self):
-        """Test filtering cards by format legality."""
-        cards = [
-            {
-                "uuid": "uuid1",
-                "name": "Standard Legal",
-                "legalities": {"standard": "Legal", "modern": "Legal"},
-            },
-            {
-                "uuid": "uuid2",
-                "name": "Not Standard Legal",
-                "legalities": {"standard": "Banned", "modern": "Legal"},
-            },
-            {
-                "uuid": "uuid3",
-                "name": "Standard Legal 2",
-                "legalities": {"standard": "Legal", "legacy": "Legal"},
-            },
-        ]
-
-        standard_legal = filter_cards_by_format(cards, "standard")
-
-        assert len(standard_legal) == 2
-        assert all(card["legalities"]["standard"] == "Legal" for card in standard_legal)
-
-    def test_filter_cards_by_format_json_string(self):
-        """Test filtering cards with JSON string legalities."""
-        cards = [
-            {
-                "uuid": "uuid1",
-                "name": "Test Card",
-                "legalities": '{"standard": "Legal", "modern": "Legal"}',
-            }
-        ]
-
-        standard_legal = filter_cards_by_format(cards, "standard")
-
-        assert len(standard_legal) == 1
-        assert standard_legal[0]["uuid"] == "uuid1"
-
 
 class TestCardProcessingEdgeCases:
     """Test edge cases in card processing."""
@@ -274,24 +162,3 @@ class TestCardProcessingEdgeCases:
         assert result[2] == "TST"
         assert result[3] == "Test Set"
 
-    def test_process_set_cards_empty_set(self):
-        """Test processing empty set."""
-        empty_set = {"code": "EMPTY", "name": "Empty Set", "cards": []}
-
-        result = process_set_cards(empty_set)
-        assert result == []
-
-    def test_process_set_cards_invalid_card(self):
-        """Test processing set with invalid card data."""
-        set_with_bad_card = {
-            "code": "TST",
-            "name": "Test Set",
-            "cards": [
-                {"uuid": "valid-uuid", "name": "Valid Card"},
-                {"invalid": "data"},  # Missing required fields
-            ],
-        }
-
-        # Should process valid cards and handle errors gracefully
-        result = process_set_cards(set_with_bad_card)
-        assert len(result) >= 0  # Depends on error handling implementation

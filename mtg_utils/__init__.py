@@ -21,7 +21,10 @@ __version__ = "1.0.0"
 __author__ = "MTG Data Processing Team"
 
 # Import main utilities for easy access
-from .card_processing import prepare_card_data, process_price_batch, process_set_cards
+from .card_processing import (
+    prepare_card_data,
+    process_all_printings_cards,
+)
 from .config import get_config, get_db_path, setup_environment
 from .database import (
     batch_insert_cards,
@@ -34,16 +37,12 @@ from .database import (
 from .exceptions import DatabaseError, FileOperationError, MTGProcessingError
 from .io_operations import (
     DownloadError,
-    download_collection,
+    download_all_data,
     download_file,
-    download_prices,
-    download_sets,
-    get_available_collections,
     get_project_paths,
     read_json_file,
     unzip_files,
     unzip_single_file,
-    validate_set_codes,
 )
 from .performance import (
     BatchProcessor,
@@ -73,16 +72,11 @@ __all__ = [
     "read_json_file",
     "get_project_paths",
     "download_file",
-    "download_sets",
-    "download_collection",
-    "download_prices",
-    "get_available_collections",
-    "validate_set_codes",
+    "download_all_data",
     "DownloadError",
     # Card processing
     "prepare_card_data",
-    "process_set_cards",
-    "process_price_batch",
+    "process_all_printings_cards",
     # Reporting
     "verify_database",
     "verify_price_data",

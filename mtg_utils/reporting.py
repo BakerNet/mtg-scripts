@@ -197,7 +197,9 @@ def export_csv_preview(results: list[tuple], limit: int = 10) -> None:
         # Show last entry
         last = results[-1]
         last_price_dollars = last[3] if last[3] else 0
-        print(f"{len(results):3}. {last[0][:30]:30} {last[1]:6} ${last_price_dollars:.2f}")
+        print(
+            f"{len(results):3}. {last[0][:30]:30} {last[1]:6} ${last_price_dollars:.2f}"
+        )
 
 
 def export_to_csv(

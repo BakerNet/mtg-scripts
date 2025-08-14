@@ -83,32 +83,42 @@ def prepare_card_data(
     return card_data
 
 
-def process_set_cards(
-    set_data: dict[str, Any], collection_name: str | None = None
-) -> list[tuple]:
-    """Process all cards in a set.
+def process_all_printings_cards(all_printings_data: dict[str, Any]) -> list[tuple]:
+    """Process all cards from AllPrintings.json.gz format.
 
     Args:
-        set_data: Set data dictionary containing cards
-        collection_name: Optional collection name
+        all_printings_data: Complete AllPrintings data dictionary
 
     Returns:
         List of card data tuples ready for insertion
     """
-    set_code = set_data.get("code", "")
-    set_name = set_data.get("name", "")
-    cards = set_data.get("cards", [])
+    all_cards = []
+    sets_data = all_printings_data.get("data", {})
 
-    card_data_list = []
-    for card in cards:
-        try:
-            card_data = prepare_card_data(card, set_code, set_name, collection_name)
-            card_data_list.append(card_data)
-        except Exception as e:
-            logger.error(f"Error processing card {card.get('name', 'Unknown')}: {e}")
+    logger.info(f"Processing {len(sets_data)} sets from AllPrintings data")
+
+    for set_code, set_data in sets_data.items():
+        if "cards" not in set_data or not set_data.get("cards"):
             continue
 
-    return card_data_list
+        # Process cards directly in this set
+        set_code = set_data.get("code", "")
+        set_name = set_data.get("name", "")
+        cards = set_data.get("cards", [])
+
+        for card in cards:
+            try:
+                card_data = prepare_card_data(card, set_code, set_name, None)
+                all_cards.append(card_data)
+            except Exception as e:
+                logger.error(f"Error processing card {card.get('name', 'Unknown')}: {e}")
+                continue
+
+        if len(all_cards) % 10000 == 0:
+            logger.debug(f"Processed {len(all_cards)} cards so far...")
+
+    logger.info(f"Processed {len(all_cards)} total cards from AllPrintings")
+    return all_cards
 
 
 def calculate_average_price(price_dict: dict[str, float]) -> float | None:
@@ -180,35 +190,6 @@ def prepare_price_data(
     return (uuid, average_price, price_date)
 
 
-def process_price_batch(
-    price_entries: dict[str, Any], existing_uuids: set
-) -> list[tuple]:
-    """Process a batch of price entries.
-
-    Args:
-        price_entries: Dictionary of UUID -> price data
-        existing_uuids: Set of UUIDs that exist in the database
-
-    Returns:
-        List of price data tuples ready for insertion
-    """
-    price_data_list = []
-    today = date.today().isoformat()
-
-    for uuid, card_price_data in price_entries.items():
-        # Skip if card not in database
-        if uuid not in existing_uuids:
-            continue
-
-        # Extract TCGPlayer price
-        avg_price = extract_tcgplayer_price(card_price_data)
-
-        if avg_price is not None:
-            price_data_list.append((uuid, avg_price, today))
-
-    return price_data_list
-
-
 def validate_card_data(card: dict[str, Any]) -> bool:
     """Validate that a card has required fields.
 
@@ -228,50 +209,3 @@ def validate_card_data(card: dict[str, Any]) -> bool:
     return True
 
 
-def merge_card_duplicates(cards: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Merge duplicate cards, keeping the most recent printing.
-
-    Args:
-        cards: List of card dictionaries
-
-    Returns:
-        List of unique cards
-    """
-    unique_cards = {}
-
-    for card in cards:
-        uuid = card.get("uuid")
-        if uuid not in unique_cards:
-            unique_cards[uuid] = card
-        else:
-            # Keep the card with more information
-            existing = unique_cards[uuid]
-            if len(str(card)) > len(str(existing)):
-                unique_cards[uuid] = card
-
-    return list(unique_cards.values())
-
-
-def filter_cards_by_format(
-    cards: list[dict[str, Any]], format_name: str
-) -> list[dict[str, Any]]:
-    """Filter cards by format legality.
-
-    Args:
-        cards: List of card dictionaries
-        format_name: Format to filter by (e.g., 'standard', 'modern')
-
-    Returns:
-        List of cards legal in the specified format
-    """
-    filtered_cards = []
-
-    for card in cards:
-        legalities = card.get("legalities", {})
-        if isinstance(legalities, str):
-            legalities = json.loads(legalities)
-
-        if legalities.get(format_name) == "Legal":
-            filtered_cards.append(card)
-
-    return filtered_cards

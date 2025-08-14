@@ -223,9 +223,9 @@ def mock_db_connection():
 def assert_query_executed(cursor, expected_query_part: str):
     """Assert that a query containing the expected part was executed."""
     executed = any(expected_query_part in query for query, _ in cursor.executed_queries)
-    assert (
-        executed
-    ), f"Expected query containing '{expected_query_part}' not found in {cursor.executed_queries}"
+    assert executed, (
+        f"Expected query containing '{expected_query_part}' not found in {cursor.executed_queries}"
+    )
 
 
 def create_test_file(path: Path, content: str | bytes):

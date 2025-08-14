@@ -45,8 +45,9 @@ def _is_valid_identifier(name: str) -> bool:
         True if valid identifier, False otherwise
     """
     import re
+
     # SQL identifier: starts with letter/underscore, followed by letters/digits/underscores
-    return bool(re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', name)) and len(name) <= 64
+    return bool(re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", name)) and len(name) <= 64
 
 
 @contextmanager

@@ -7,11 +7,12 @@ Requires Python 3.10+
 """
 
 import gzip
+import hashlib
 import json
 import logging
 import urllib.request
 from pathlib import Path
-from typing import Any, List
+from typing import Any
 from urllib.error import HTTPError, URLError
 
 import tqdm
@@ -38,7 +39,7 @@ def _validate_file_path(file_path: Path, base_dir: Path = None) -> Path:
 
         # Check for suspicious patterns
         path_str = str(file_path)
-        if '..' in path_str or path_str.startswith('/'):
+        if ".." in path_str or path_str.startswith("/"):
             # Allow absolute paths but log them
             logger.warning(f"Absolute or relative path used: {file_path}")
 
@@ -48,12 +49,15 @@ def _validate_file_path(file_path: Path, base_dir: Path = None) -> Path:
             try:
                 resolved_path.relative_to(base_resolved)
             except ValueError:
-                raise ValueError(f"Path {file_path} is outside allowed directory {base_dir}")
+                raise ValueError(
+                    f"Path {file_path} is outside allowed directory {base_dir}"
+                )
 
         return resolved_path
 
     except (OSError, RuntimeError) as e:
         raise ValueError(f"Invalid file path: {file_path}") from e
+
 
 logger = logging.getLogger(__name__)
 
@@ -193,7 +197,7 @@ def write_json_file(data: dict[str, Any], file_path: Path, indent: int = 2) -> N
 
 def read_card_list(file_path: Path) -> list[str]:
     """Read card names from various deck list formats.
-    
+
     Supports multiple formats:
     - Plain text: One card name per line
     - MTGO format (.txt): "4 Lightning Bolt" with optional "Sideboard" section
@@ -212,7 +216,7 @@ def read_card_list(file_path: Path) -> list[str]:
         ValueError: If path traversal is detected
     """
     import re
-    
+
     # Validate path to prevent directory traversal
     validated_path = _validate_file_path(file_path)
 
@@ -220,11 +224,11 @@ def read_card_list(file_path: Path) -> list[str]:
         raise FileNotFoundError(f"Card list file not found: {validated_path}")
 
     card_names = []
-    
+
     # Try different encodings to handle various file formats
-    encodings_to_try = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+    encodings_to_try = ["utf-8", "latin-1", "cp1252", "iso-8859-1"]
     file_content = None
-    
+
     for encoding in encodings_to_try:
         try:
             with open(validated_path, "r", encoding=encoding) as f:
@@ -232,70 +236,65 @@ def read_card_list(file_path: Path) -> list[str]:
                 break
         except UnicodeDecodeError:
             continue
-    
+
     if file_content is None:
-        raise ValueError(f"Could not decode file {validated_path} with any supported encoding")
-    
-    in_sideboard = False
-    in_deck_section = False
-    
+        raise ValueError(
+            f"Could not decode file {validated_path} with any supported encoding"
+        )
+
     for line in file_content.splitlines():
-            line = line.strip()
-            
-            # Skip empty lines and comments
-            if not line or line.startswith('//'):
-                continue
-            
-            # Handle MTGS format deck tags
-            if line == '[DECK]':
-                in_deck_section = True
-                continue
-            elif line == '[/DECK]':
-                in_deck_section = False
-                continue
-            elif line.startswith('[URL=') or line.startswith('[/URL]'):
-                # Skip URL tags in MTGS format
-                continue
-                
-            # Check for sideboard markers
-            if line.lower() == 'sideboard':
-                in_sideboard = True
-                continue
-            
-            # Handle DEK format sideboard entries (SB: prefix)
-            if line.startswith('SB:'):
-                line = line[3:].strip()  # Remove "SB:" prefix
-                in_sideboard = True
-            
-            # Parse MTGS format: "4x\tLightning Bolt" (tab-separated with 'x' suffix)
-            mtgs_match = re.match(r'^(\d+)x\t(.+)$', line)
-            if mtgs_match:
-                quantity = int(mtgs_match.group(1))
-                card_name = mtgs_match.group(2).strip()
-                
-                # Add the card name the specified number of times
-                for _ in range(quantity):
-                    card_names.append(card_name)
-                continue
-                
-            # Parse standard quantity + card name format
-            # Match patterns like "4 Lightning Bolt", "1 Troll of Khazad-dûm", or "4 [MOR] Heritage Druid"
-            match = re.match(r'^(\d+)\s+(.+)$', line)
-            if match:
-                quantity = int(match.group(1))
-                card_part = match.group(2).strip()
-                
-                # Remove set annotations in brackets (e.g., "[MOR] Heritage Druid" -> "Heritage Druid")
-                # Handle empty brackets [] as well
-                card_name = re.sub(r'^\[[^\]]*\]\s*', '', card_part).strip()
-                
-                # Add the card name the specified number of times
-                for _ in range(quantity):
-                    card_names.append(card_name)
-            else:
-                # Plain text format - just add the card name once
-                if line:
-                    card_names.append(line)
+        line = line.strip()
+
+        # Skip empty lines and comments
+        if not line or line.startswith("//"):
+            continue
+
+        # Handle MTGS format deck tags
+        if line == "[DECK]":
+            continue
+        elif line == "[/DECK]":
+            continue
+        elif line.startswith("[URL=") or line.startswith("[/URL]"):
+            # Skip URL tags in MTGS format
+            continue
+
+        # Check for sideboard markers
+        if line.lower() == "sideboard":
+            continue
+
+        # Handle DEK format sideboard entries (SB: prefix)
+        if line.startswith("SB:"):
+            line = line[3:].strip()  # Remove "SB:" prefix
+
+        # Parse MTGS format: "4x\tLightning Bolt" (tab-separated with 'x' suffix)
+        mtgs_match = re.match(r"^(\d+)x\t(.+)$", line)
+        if mtgs_match:
+            quantity = int(mtgs_match.group(1))
+            card_name = mtgs_match.group(2).strip()
+
+            # Add the card name the specified number of times
+            for _ in range(quantity):
+                card_names.append(card_name)
+            continue
+
+        # Parse standard quantity + card name format
+        # Match patterns like "4 Lightning Bolt", "1 Troll of Khazad-dûm", or "4 [MOR] Heritage Druid"
+        match = re.match(r"^(\d+)\s+(.+)$", line)
+        if match:
+            quantity = int(match.group(1))
+            card_part = match.group(2).strip()
+
+            # Remove set annotations in brackets (e.g., "[MOR] Heritage Druid" -> "Heritage Druid")
+            # Handle empty brackets [] as well
+            card_name = re.sub(r"^\[[^\]]*\]\s*", "", card_part).strip()
+
+            # Add the card name the specified number of times
+            for _ in range(quantity):
+                card_names.append(card_name)
+        else:
+            # Plain text format - just add the card name once
+            if line:
+                card_names.append(line)
 
     logger.info(f"✓ Read {len(card_names)} card entries from {validated_path}")
     return card_names
@@ -372,24 +371,67 @@ def ensure_source_files_exist(
 # MTGJSON API base URL
 MTGJSON_BASE_URL = "https://mtgjson.com/api/v5/"
 
-# Available collections
-AVAILABLE_COLLECTIONS = {
-    "Legacy",
-    "Modern",
-    "Vintage",
-    "Standard",
-    "Pioneer",
-    "Commander",
-    "Historic",
-    "Alchemy",
-    "Explorer",
-}
 
 
 class DownloadError(Exception):
     """Exception raised for download errors."""
 
     pass
+
+
+def calculate_sha256(file_path: Path) -> str:
+    """Calculate SHA256 hash of a file.
+
+    Args:
+        file_path: Path to the file
+
+    Returns:
+        Hex digest of the SHA256 hash
+    """
+    sha256_hash = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for byte_block in iter(lambda: f.read(4096), b""):
+            sha256_hash.update(byte_block)
+    return sha256_hash.hexdigest()
+
+
+def download_hash(url: str) -> str:
+    """Download and return the content of a hash file.
+
+    Args:
+        url: URL to the hash file (e.g., .sha256 file)
+
+    Returns:
+        The hash value from the file
+
+    Raises:
+        DownloadError: If download fails
+    """
+    try:
+        with urllib.request.urlopen(url) as response:
+            content = response.read().decode('utf-8').strip()
+            # Hash files may contain just the hash or "hash filename"
+            # Extract just the hash part
+            return content.split()[0]
+    except Exception as e:
+        raise DownloadError(f"Failed to download hash from {url}: {e}")
+
+
+def needs_download(file_path: Path, expected_hash: str) -> bool:
+    """Check if a file needs to be downloaded based on SHA256 hash.
+
+    Args:
+        file_path: Path to the existing file
+        expected_hash: Expected SHA256 hash
+
+    Returns:
+        True if file needs to be downloaded, False if it's up to date
+    """
+    if not file_path.exists():
+        return True
+
+    actual_hash = calculate_sha256(file_path)
+    return actual_hash != expected_hash
 
 
 def download_file(url: str, dest_path: Path, show_progress: bool = True) -> None:
@@ -442,90 +484,48 @@ def download_file(url: str, dest_path: Path, show_progress: bool = True) -> None
         raise DownloadError(f"Download failed: {e}")
 
 
-def download_sets(
-    set_codes: List[str], dest_dir: Path, clear_existing: bool = False
-) -> List[Path]:
-    """Download individual MTG set files from MTGJSON.
+def smart_download_file(url: str, dest_path: Path, show_progress: bool = True) -> bool:
+    """Download a file only if needed (based on SHA256 hash comparison).
 
     Args:
-        set_codes: List of set codes to download (e.g. ['ZEN', 'WWK', 'ROE'])
-        dest_dir: Directory to save files to
-        clear_existing: Whether to clear existing files first
+        url: URL to download from
+        dest_path: Path to save the file to
+        show_progress: Whether to show progress bar
 
     Returns:
-        List of paths to downloaded files
-
-    Raises:
-        DownloadError: If any download fails
-    """
-    if not set_codes:
-        raise ValueError("No set codes provided")
-
-    if clear_existing:
-        _clear_directory(dest_dir, "*.json.gz")
-        _clear_directory(dest_dir.parent / "json", "*.json")
-
-    logger.info(f"Downloading {len(set_codes)} set files")
-    downloaded_files = []
-    failed_downloads = []
-
-    for set_code in set_codes:
-        set_code = set_code.upper()
-        filename = f"{set_code}.json.gz"
-        url = f"{MTGJSON_BASE_URL}{filename}"
-        dest_path = dest_dir / filename
-
-        try:
-            download_file(url, dest_path)
-            downloaded_files.append(dest_path)
-        except DownloadError as e:
-            logger.error(f"Failed to download {set_code}: {e}")
-            failed_downloads.append(set_code)
-
-    if failed_downloads:
-        logger.warning(f"Failed to download: {', '.join(failed_downloads)}")
-
-    logger.info(
-        f"✓ Successfully downloaded {len(downloaded_files)}/{len(set_codes)} sets"
-    )
-    return downloaded_files
-
-
-def download_collection(
-    collection_name: str, dest_dir: Path, clear_existing: bool = False
-) -> Path:
-    """Download a MTG collection file from MTGJSON.
-
-    Args:
-        collection_name: Name of collection (e.g. 'Legacy', 'Modern', 'Vintage')
-        dest_dir: Directory to save file to
-        clear_existing: Whether to clear existing files first
-
-    Returns:
-        Path to downloaded file
+        True if file was downloaded, False if it was already up to date
 
     Raises:
         DownloadError: If download fails
-        ValueError: If collection name is invalid
     """
-    if collection_name not in AVAILABLE_COLLECTIONS:
-        available = ", ".join(sorted(AVAILABLE_COLLECTIONS))
-        raise ValueError(
-            f"Invalid collection '{collection_name}'. Available: {available}"
-        )
+    hash_url = f"{url}.sha256"
 
-    filename = f"{collection_name}.json.gz"
-    url = f"{MTGJSON_BASE_URL}{filename}"
-    dest_path = dest_dir / filename
+    try:
+        # Download the expected hash
+        expected_hash = download_hash(hash_url)
 
-    if clear_existing:
-        _clear_directory(dest_dir, "*.json.gz")
-        _clear_directory(dest_dir.parent / "json", "*.json")
+        # Check if we need to download
+        if not needs_download(dest_path, expected_hash):
+            logger.info(f"File {dest_path.name} is up to date (hash matches)")
+            return False
 
-    logger.info(f"Downloading {collection_name} collection")
-    download_file(url, dest_path)
+        # File needs downloading
+        logger.info(f"File {dest_path.name} needs updating")
+        download_file(url, dest_path, show_progress)
 
-    return dest_path
+        # Verify the downloaded file
+        actual_hash = calculate_sha256(dest_path)
+        if actual_hash != expected_hash:
+            raise DownloadError(f"Downloaded file hash mismatch: expected {expected_hash}, got {actual_hash}")
+
+        logger.info(f"✓ Downloaded and verified {dest_path.name}")
+        return True
+
+    except Exception as e:
+        # If hash checking fails, fall back to regular download
+        logger.warning(f"Hash checking failed for {url}: {e}. Downloading anyway.")
+        download_file(url, dest_path, show_progress)
+        return True
 
 
 def download_prices(dest_dir: Path, clear_existing: bool = False) -> Path:
@@ -550,41 +550,69 @@ def download_prices(dest_dir: Path, clear_existing: bool = False) -> Path:
         _clear_directory(dest_dir.parent / "json", "*.json")
 
     logger.info("Downloading price data")
-    download_file(url, dest_path)
+    was_downloaded = smart_download_file(url, dest_path)
+
+    if was_downloaded:
+        logger.info("✓ Downloaded new version of AllPrices")
+    else:
+        logger.info("✓ AllPrices is already up to date")
 
     return dest_path
 
 
-def get_available_collections() -> List[str]:
-    """Get list of available collection names.
-
-    Returns:
-        Sorted list of collection names
-    """
-    return sorted(AVAILABLE_COLLECTIONS)
-
-
-def validate_set_codes(set_codes: List[str]) -> List[str]:
-    """Validate and clean set codes.
+def download_all_cards(dest_dir: Path, clear_existing: bool = False) -> Path:
+    """Download AllPrintings.json.gz from MTGJSON containing all MTG cards.
 
     Args:
-        set_codes: List of set codes to validate
+        dest_dir: Directory to save file to
+        clear_existing: Whether to clear existing files first
 
     Returns:
-        List of cleaned (uppercase) set codes
+        Path to downloaded file
+
+    Raises:
+        DownloadError: If download fails
     """
-    if not set_codes:
-        raise ValueError("No set codes provided")
+    filename = "AllPrintings.json.gz"
+    url = f"{MTGJSON_BASE_URL}{filename}"
+    dest_path = dest_dir / filename
 
-    # Clean up set codes (uppercase, remove duplicates)
-    cleaned_codes = list(
-        dict.fromkeys(code.upper().strip() for code in set_codes if code.strip())
-    )
+    if clear_existing:
+        _clear_directory(dest_dir, "*.json.gz")
+        _clear_directory(dest_dir.parent / "json", "*.json")
 
-    if not cleaned_codes:
-        raise ValueError("No valid set codes provided")
+    logger.info("Downloading complete card database (AllPrintings)")
+    was_downloaded = smart_download_file(url, dest_path)
 
-    return cleaned_codes
+    if was_downloaded:
+        logger.info("✓ Downloaded new version of AllPrintings")
+    else:
+        logger.info("✓ AllPrintings is already up to date")
+
+    return dest_path
+
+
+def download_all_data(clear_existing: bool = False) -> tuple[Path, Path]:
+    """Download all MTG data (cards and prices) from MTGJSON.
+
+    Args:
+        clear_existing: Whether to clear existing files first
+
+    Returns:
+        Tuple of (cards_file_path, prices_file_path)
+
+    Raises:
+        DownloadError: If any download fails
+    """
+    # Use the sets directory for the complete database
+    cards_paths = get_project_paths("sets")
+    prices_paths = get_project_paths("prices")
+
+    cards_file = download_all_cards(cards_paths["gzipped"], clear_existing)
+    prices_file = download_prices(prices_paths["gzipped"], clear_existing)
+
+    logger.info("✓ Downloaded complete MTG database (cards and prices)")
+    return cards_file, prices_file
 
 
 def _clear_directory(directory: Path, pattern: str = "*") -> None:

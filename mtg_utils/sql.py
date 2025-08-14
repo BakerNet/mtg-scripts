@@ -48,10 +48,9 @@ CARDS_TABLE_SCHEMA = """
 
 CARD_PRICES_TABLE_SCHEMA = """
     CREATE TABLE card_prices (
-        uuid TEXT NOT NULL,
+        uuid TEXT PRIMARY KEY,
         average_price REAL,
-        price_date DATE NOT NULL,
-        PRIMARY KEY (uuid, price_date),
+        last_updated DATE,
         FOREIGN KEY (uuid) REFERENCES cards(uuid)
     )
 """
@@ -76,14 +75,7 @@ CARDS_INDEXES: list[tuple[str, str]] = [
 ]
 
 PRICE_INDEXES: list[tuple[str, str]] = [
-    (
-        "idx_price_uuid",
-        "CREATE INDEX IF NOT EXISTS idx_price_uuid ON card_prices(uuid)",
-    ),
-    (
-        "idx_price_date",
-        "CREATE INDEX IF NOT EXISTS idx_price_date ON card_prices(price_date)",
-    ),
+    # UUID is already the primary key, no need for additional index
 ]
 
 # =============================================================================
@@ -176,11 +168,83 @@ GET_TOP_CARDS_WITH_PRICES = """
     LIMIT ?
 """
 
+GET_TOP_CARDS_WITH_SETS_FILTER = """
+    SELECT c.name, c.set_code, c.set_name, cp.average_price
+    FROM cards c
+    JOIN card_prices cp ON c.uuid = cp.uuid
+    WHERE c.set_code IN ({set_placeholders})
+    ORDER BY cp.average_price DESC
+    LIMIT ?
+"""
+
+GET_TOP_CARDS_WITH_FORMATS_FILTER = """
+    SELECT c.name, c.set_code, c.set_name, cp.average_price
+    FROM cards c
+    JOIN card_prices cp ON c.uuid = cp.uuid
+    WHERE EXISTS (
+        SELECT 1 FROM json_each(c.legalities)
+        WHERE json_each.key IN ({format_placeholders})
+        AND json_each.value = 'Legal'
+    )
+    ORDER BY cp.average_price DESC
+    LIMIT ?
+"""
+
+GET_TOP_CARDS_WITH_SETS_AND_FORMATS_FILTER = """
+    SELECT c.name, c.set_code, c.set_name, cp.average_price
+    FROM cards c
+    JOIN card_prices cp ON c.uuid = cp.uuid
+    WHERE c.set_code IN ({set_placeholders})
+    AND EXISTS (
+        SELECT 1 FROM json_each(c.legalities)
+        WHERE json_each.key IN ({format_placeholders})
+        AND json_each.value = 'Legal'
+    )
+    ORDER BY cp.average_price DESC
+    LIMIT ?
+"""
+
 GET_CARDS_FROM_LIST = """
     SELECT c.name, c.set_code, c.set_name, COALESCE(cp.average_price, 0) as price
     FROM cards c
     JOIN temp_card_list tcl ON LOWER(TRIM(c.name)) = LOWER(TRIM(tcl.name))
     LEFT JOIN card_prices cp ON c.uuid = cp.uuid
+    ORDER BY c.name, c.set_code
+"""
+
+GET_CARDS_FROM_LIST_WITH_SETS_FILTER = """
+    SELECT c.name, c.set_code, c.set_name, COALESCE(cp.average_price, 0) as price
+    FROM cards c
+    JOIN temp_card_list tcl ON LOWER(TRIM(c.name)) = LOWER(TRIM(tcl.name))
+    LEFT JOIN card_prices cp ON c.uuid = cp.uuid
+    WHERE c.set_code IN ({set_placeholders})
+    ORDER BY c.name, c.set_code
+"""
+
+GET_CARDS_FROM_LIST_WITH_FORMATS_FILTER = """
+    SELECT c.name, c.set_code, c.set_name, COALESCE(cp.average_price, 0) as price
+    FROM cards c
+    JOIN temp_card_list tcl ON LOWER(TRIM(c.name)) = LOWER(TRIM(tcl.name))
+    LEFT JOIN card_prices cp ON c.uuid = cp.uuid
+    WHERE EXISTS (
+        SELECT 1 FROM json_each(c.legalities)
+        WHERE json_each.key IN ({format_placeholders})
+        AND json_each.value = 'Legal'
+    )
+    ORDER BY c.name, c.set_code
+"""
+
+GET_CARDS_FROM_LIST_WITH_SETS_AND_FORMATS_FILTER = """
+    SELECT c.name, c.set_code, c.set_name, COALESCE(cp.average_price, 0) as price
+    FROM cards c
+    JOIN temp_card_list tcl ON LOWER(TRIM(c.name)) = LOWER(TRIM(tcl.name))
+    LEFT JOIN card_prices cp ON c.uuid = cp.uuid
+    WHERE c.set_code IN ({set_placeholders})
+    AND EXISTS (
+        SELECT 1 FROM json_each(c.legalities)
+        WHERE json_each.key IN ({format_placeholders})
+        AND json_each.value = 'Legal'
+    )
     ORDER BY c.name, c.set_code
 """
 
@@ -216,6 +280,7 @@ ROLLBACK_TRANSACTION = "ROLLBACK"
 # HELPER FUNCTIONS
 # =============================================================================
 
+
 def get_insert_cards_query(num_columns: int) -> str:
     """Generate INSERT OR REPLACE query for cards table.
 
@@ -229,7 +294,7 @@ def get_insert_cards_query(num_columns: int) -> str:
     return f"INSERT OR REPLACE INTO cards VALUES ({placeholders})"
 
 
-INSERT_PRICE_QUERY = "INSERT OR REPLACE INTO card_prices (uuid, average_price, price_date) VALUES (?, ?, ?)"
+INSERT_PRICE_QUERY = "INSERT OR REPLACE INTO card_prices (uuid, average_price, last_updated) VALUES (?, ?, ?)"
 
 
 def get_batch_insert_prices_query(batch_size: int) -> str:
@@ -242,10 +307,12 @@ def get_batch_insert_prices_query(batch_size: int) -> str:
         SQL query for batch price insertion
     """
     values_clause = ",".join(["(?, ?, ?)"] * batch_size)
-    return f"INSERT OR REPLACE INTO card_prices (uuid, average_price, price_date) VALUES {values_clause}"
+    return f"INSERT OR REPLACE INTO card_prices (uuid, average_price, last_updated) VALUES {values_clause}"
 
 
-def create_temp_table_query(table_name: str, column_definition: str = "name TEXT") -> str:
+def create_temp_table_query(
+    table_name: str, column_definition: str = "name TEXT"
+) -> str:
     """Generate CREATE TEMP TABLE query.
 
     Args:
