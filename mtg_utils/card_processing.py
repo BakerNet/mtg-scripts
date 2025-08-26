@@ -111,7 +111,9 @@ def process_all_printings_cards(all_printings_data: dict[str, Any]) -> list[tupl
                 card_data = prepare_card_data(card, set_code, set_name, None)
                 all_cards.append(card_data)
             except Exception as e:
-                logger.error(f"Error processing card {card.get('name', 'Unknown')}: {e}")
+                logger.error(
+                    f"Error processing card {card.get('name', 'Unknown')}: {e}"
+                )
                 continue
 
         if len(all_cards) % 10000 == 0:
@@ -207,5 +209,3 @@ def validate_card_data(card: dict[str, Any]) -> bool:
             return False
 
     return True
-
-

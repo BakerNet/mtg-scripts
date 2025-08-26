@@ -372,7 +372,6 @@ def ensure_source_files_exist(
 MTGJSON_BASE_URL = "https://mtgjson.com/api/v5/"
 
 
-
 class DownloadError(Exception):
     """Exception raised for download errors."""
 
@@ -409,7 +408,7 @@ def download_hash(url: str) -> str:
     """
     try:
         with urllib.request.urlopen(url) as response:
-            content = response.read().decode('utf-8').strip()
+            content = response.read().decode("utf-8").strip()
             # Hash files may contain just the hash or "hash filename"
             # Extract just the hash part
             return content.split()[0]
@@ -516,7 +515,9 @@ def smart_download_file(url: str, dest_path: Path, show_progress: bool = True) -
         # Verify the downloaded file
         actual_hash = calculate_sha256(dest_path)
         if actual_hash != expected_hash:
-            raise DownloadError(f"Downloaded file hash mismatch: expected {expected_hash}, got {actual_hash}")
+            raise DownloadError(
+                f"Downloaded file hash mismatch: expected {expected_hash}, got {actual_hash}"
+            )
 
         logger.info(f"✓ Downloaded and verified {dest_path.name}")
         return True

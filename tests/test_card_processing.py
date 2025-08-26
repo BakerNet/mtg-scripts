@@ -75,7 +75,6 @@ class TestCardProcessing:
 
         assert result[22] == 1  # is_reprint should be 1 for True
 
-
     def test_calculate_average_price(self):
         """Test price calculation."""
         price_dict = {"2023-01-01": 1.00, "2023-01-02": 2.00, "2023-01-03": 3.00}
@@ -123,7 +122,6 @@ class TestCardProcessing:
         card_price_data = {"paper": {"tcgplayer": {"retail": {}}}}
         assert extract_tcgplayer_price(card_price_data) is None
 
-
     def test_validate_card_data_valid(self, sample_card_data: dict):
         """Test validating valid card data."""
         assert validate_card_data(sample_card_data) is True
@@ -161,4 +159,3 @@ class TestCardProcessingEdgeCases:
         assert result[1] == "Test Card"
         assert result[2] == "TST"
         assert result[3] == "Test Set"
-

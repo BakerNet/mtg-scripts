@@ -2,6 +2,10 @@
 *.json.gz
 *.csv
 *.db
+planning
+models
+test_files
+.env
 analyses
 CLAUDE.md
 __pycache__
